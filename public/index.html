@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>Ledger — Who Owes Whom</title>
+<meta name="theme-color" content="#0B1420">
+<script>
+  const LANG_VERSION = '1';
+  if (localStorage.getItem('ledger_lang_version') !== LANG_VERSION) {
+    localStorage.removeItem('ledger_lang');
+    localStorage.setItem('ledger_lang_version', LANG_VERSION);
+  }
+  window.lang = localStorage.getItem('ledger_lang') || 'en';
+  document.documentElement.lang = window.lang;
+  if (localStorage.getItem('ledger_theme') === 'light') document.documentElement.classList.remove('dark');
+  else document.documentElement.classList.add('dark');
+
+  window.__earlySwitchRequested = false;
+  function handleEarlySwitch() {
+    window.__earlySwitchRequested = true;
+    var boot = document.getElementById('boot');
+    if (boot) { boot.style.opacity = '0'; setTimeout(function(){ boot.style.display = 'none'; }, 300); }
+    var root = document.getElementById('root');
+    if(root) { root.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;width:100%;"><div style="width:40px;height:40px;border:4px solid #C9A961;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px;"></div><p style="color:#64748b;font-weight:bold;font-family:sans-serif;">Clearing session...</p></div>'; }
+    localStorage.removeItem('ledger_admin_token');
+    localStorage.removeItem('ledger_pending_delete');
+    localStorage.removeItem('ledger_pending_pin_reset');
+    Object.keys(localStorage).forEach(key => { if (key.startsWith('ledger_pin_verified_')) localStorage.removeItem(key); });
+  }
+</script>
+<style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800&family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: { extend: {
+    fontFamily: { display: ['"Fraunces"','serif'], body: ['"Public Sans"','sans-serif'], mono: ['"IBM Plex Mono"','monospace'] },
+    colors: { ink:'#0B1420', inkCard:'#16283F', brass:'#C9A961', oxblood:'#B8402E', amber:'#D98F3B', steel:'#5B7A9D' }
+  }}
+}
+</script>
+<style>
+  :root { --focus-color: #C9A961; --focus-ring: rgba(201,169,97,0.4); }
+  * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  html,body { background:#F1EAD6; min-height:100vh; min-height:100dvh; width:100%; max-width:100%; margin:0; padding:0; transition: background .4s ease; overflow-x:hidden; }
+  html.dark, html.dark body { background:#0B1420; }
+  body { font-family:'Public Sans',sans-serif; }
+  .disp { font-family:'Fraunces',serif; font-optical-sizing:auto; letter-spacing:-0.01em; }
+  .mono { font-family:'IBM Plex Mono',monospace; }
+  .hide-scrollbar::-webkit-scrollbar{display:none} .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+  .glass { background:#FFFDF7; border:1px solid rgba(11,20,32,0.08); box-shadow: 0 1px 0 rgba(11,20,32,0.04); }
+  .dark .glass { background:#16283F; border:1px solid rgba(237,230,210,0.08); box-shadow: 0 1px 0 rgba(0,0,0,0.2); }
+  .glass-input { background:#FBF7EC; border:1px solid rgba(11,20,32,0.12); }
+  .dark .glass-input { background:#101E32; border:1px solid rgba(237,230,210,0.1); }
+  .dyn-focus:focus { border-color: var(--focus-color) !important; box-shadow: 0 0 0 1.5px var(--focus-ring) !important; }
+  .cut{ clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,0 100%) }
+  .ruled { background-image: repeating-linear-gradient(to bottom, transparent, transparent 30px, rgba(11,20,32,0.05) 31px); }
+  .dark .ruled { background-image: repeating-linear-gradient(to bottom, transparent, transparent 30px, rgba(237,230,210,0.05) 31px); }
+  .ledger-rule{ border-left-width:3px; border-left-style:solid; }
+  .stamp{ display:inline-flex; align-items:center; justify-content:center; border:1.5px dashed currentColor; border-radius:9999px; font-family:'Fraunces',serif; letter-spacing:0.06em; text-transform:uppercase; transform:rotate(-4deg); }
+  input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  @media (max-width: 767px){ input, select, textarea { font-size: 16px !important; } }
+  .fade-in{animation:fadeIn .4s cubic-bezier(.16,1,.3,1) forwards} @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .pop-in{animation:popIn .35s cubic-bezier(.16,1,.3,1) forwards} @keyframes popIn{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+  .toast-in{animation:toastIn .3s ease-out forwards} @keyframes toastIn{from{opacity:0;transform:translateX(110%)}to{opacity:1;transform:translateX(0)}}
+  #boot{transition:opacity .4s ease,visibility .4s ease} .boot-hide{opacity:0;visibility:hidden;pointer-events:none}
+  ::selection{background:#C9A961;color:#101B2C}
+  .dot{width:11px;height:11px;border-radius:2px;background:rgba(11,20,32,.12);transition:all .2s ease;transform:rotate(45deg)}
+  .dark .dot{background:rgba(237,230,210,.14)}
+  .dot.filled{background:#C9A961;box-shadow:0 0 10px rgba(201,169,97,.6)}
+  .key-btn{transition:transform .12s ease,background .12s ease} .key-btn:active{transform:scale(.92)}
+  #root { width: 100%; min-height: 100dvh; display: flex; flex-direction: column; }
+  .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+</style>
+</head>
+<body class="text-slate-900 dark:text-slate-100 flex flex-col h-full w-full relative">
+
+<div id="boot" class="fixed inset-0 bg-[#F1EAD6] dark:bg-[#0B1420] z-[999] flex flex-col items-center justify-center gap-6 p-4">
+  <div class="w-24 h-24 rounded-full bg-[#0B1420] dark:bg-[#101E32] border-[3px] border-brass flex items-center justify-center shadow-[0_0_36px_rgba(201,169,97,0.25)] animate-pulse">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#C9A961" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/></svg>
+  </div>
+  <div class="flex flex-col items-center gap-2 w-full max-w-sm text-center">
+    <p class="text-[10px] font-bold uppercase tracking-[0.3em] text-brass mb-0.5">Private Account Book</p>
+    <h2 class="disp font-bold italic text-3xl tracking-tight text-slate-800 dark:text-[#EDE6D2]">Ledger</h2>
+    <div id="bootAccount" class="hidden w-full mt-4 mb-2"></div>
+    <div class="flex items-center gap-2 mt-2">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-brass animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+      <p id="bootStatusText" class="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Starting Ledger</p>
+    </div>
+    <div class="flex items-center gap-3 mt-4">
+      <button id="bootRetryBtn" onclick="window.location.reload()" class="hidden text-[11px] font-bold text-brass underline">Retry</button>
+      <button id="bootSwitchBtn" onclick="typeof window.switchAccount === 'function' ? window.switchAccount() : handleEarlySwitch(); setTimeout(()=>window.location.reload(),500);" class="px-4 py-2 rounded-lg bg-white/70 dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-700 dark:text-slate-200 shadow-sm z-50 transition-transform active:scale-95">Clear Cache</button>
+    </div>
+  </div>
+</div>
+
+<div id="root"></div>
+
+<div id="modalContainer" class="fixed inset-0 bg-slate-900/60 dark:bg-black/80 z-[100] hidden flex justify-center items-center px-4 backdrop-blur-md overflow-y-auto py-8"></div>
+<div id="pinContainer" class="fixed inset-0 bg-slate-900/70 dark:bg-black/85 z-[150] hidden flex justify-center items-end backdrop-blur-md"></div>
+<div id="toast-container" class="fixed top-8 right-4 z-[300] flex flex-col gap-2 pointer-events-none"></div>
+
+<div id="cropperModal" class="fixed inset-0 bg-black/95 z-[999] hidden flex-col touch-none">
+  <div class="flex-1 relative overflow-hidden" id="cropperArea">
+    <img id="cropperImg" class="absolute pointer-events-none origin-top-left" style="max-width:none!important">
+    <div class="absolute pointer-events-none" style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.8); border: 2px solid white; border-radius: 50%; width: 260px; height: 260px; left: 50%; top: 50%; margin-left: -130px; margin-top: -130px;"></div>
+  </div>
+  <div class="p-6 pb-10 bg-slate-900">
+    <div class="flex items-center gap-4 mb-6">
+      <i data-lucide="zoom-out" class="w-5 h-5 text-slate-400"></i>
+      <input type="range" id="cropZoom" class="flex-1 accent-brass">
+      <i data-lucide="zoom-in" class="w-5 h-5 text-slate-400"></i>
+    </div>
+    <div class="flex gap-4">
+      <button onclick="window.closeCropper()" class="px-5 py-3.5 bg-slate-800 rounded-lg font-bold flex-1 text-white">Cancel</button>
+      <button onclick="window.doCrop()" class="px-5 py-3.5 bg-brass text-[#101B2C] rounded-lg font-bold flex-1 shadow-lg">Save Photo</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
+
+window.isApp = navigator.userAgent.includes('LedgerApp');
+
+const LANG = {
+  bn: {
+    dashboard: "হোম", contacts: "মানুষ", history: "হিস্ট্রি", profile: "প্রোফাইল",
+    welcome: "স্বাগতম", youll_get: "আপনি পাবেন", youll_pay: "আপনি দিবেন", net_balance: "নেট ব্যালেন্স",
+    recent: "সাম্প্রতিক লেনদেন", see_all: "সব দেখুন", no_entries: "এখনো কোনো এন্ট্রি নেই।",
+    add_contact: "নতুন মানুষ যোগ করুন", contact_name: "নাম", contact_phone: "মোবাইল নাম্বার (ঐচ্ছিক)",
+    pick_contact: "কন্টাক্ট থেকে বাছাই করুন", save: "সেভ করুন", owes_you: "আপনাকে দিবে", you_owe: "আপনি দিবেন", settled: "হিসাব ক্লিয়ার",
+    gave: "দিলাম", took: "নিলাম", amount_label: "পরিমাণ (৳)", note_label: "নোট / কারণ (ঐচ্ছিক)", date_label: "তারিখ", save_entry: "এন্ট্রি সেভ করুন",
+    entry_history: "লেনদেনের হিস্ট্রি", del: "মুছুন", edit_contact: "এডিট করুন", delete_contact: "মানুষ মুছে ফেলুন",
+    all: "সব", search: "খুঁজুন...", sort_date: "তারিখ অনুযায়ী", sort_entry: "এন্ট্রি অনুযায়ী",
+    change_pin: "পিন পরিবর্তন করুন", danger: "বিপদজনক অঞ্চল", reset_all: "সম্পূর্ণ হিসাব রিসেট করুন",
+    delete_account: "অ্যাকাউন্ট ও ডেটা ডিলিট করুন", logout: "লগআউট", lang_switch: "Switch to English",
+    save_success: "সেভ হয়েছে!", req_fields: "নাম আবশ্যক", req_entry_fields: "সঠিক পরিমাণ দিন",
+    del_confirm_1: "ডিলিট কনফার্মেশন (১/২)", del_confirm_2: "চূড়ান্ত কনফার্মেশন (২/২)", enter_pin_cont: "চালিয়ে যেতে পিন দিন", enter_pin_perm: "স্থায়ীভাবে ডিলিট করতে আবার পিন দিন",
+    wrong_pin: "ভুল পিন!", pin_length_err: "৬ সংখ্যার পিন দিন", old_pin_err: "পুরাতন পিন সঠিক নয়", mismatch: "পিন মিলেনি!",
+    setting_pin: "PIN সেট করা হচ্ছে...", pin_set_success: "PIN সফলভাবে সেট হয়েছে!", logging_in: "লগইন করা হচ্ছে...", login_success: "সফলভাবে লগইন হয়েছে",
+    verifying: "যাচাই করা হচ্ছে...", deleted: "মুছে ফেলা হয়েছে!", updating: "আপডেট করা হচ্ছে...", error: "ত্রুটি", old_pin_required: "পুরাতন PIN প্রয়োজন",
+    signed_in_as: "লগইন করা আছে", switch_account: "অ্যাকাউন্ট পরিবর্তন", ledger_locked: "খাতা লক করা আছে", setup_pin_description: "আপনার হিসাব সুরক্ষিত রাখতে একটি ৬-সংখ্যার PIN তৈরি করুন।",
+    setup_security_pin: "সিকিউরিটি PIN সেট করুন", confirm_pin: "PIN নিশ্চিত করুন", confirm_pin_desc: "একই PIN আবার দিন", verify_identity: "খাতায় প্রবেশ করতে আপনার পরিচয় যাচাই করুন।", unlock_ledger: "Unlock Ledger",
+    loading_data: "ডাটা লোড হচ্ছে...", logging_out: "নিরাপদে লগআউট করা হচ্ছে...",
+    forgot_pin_instruction: "একই অ্যাকাউন্ট দিয়ে পুনরায় লগইন করে PIN রিসেট করুন।",
+    total_gave: "মোট দিলাম", total_took: "মোট নিলাম", no_history: "কোনো হিস্ট্রি নেই", export_data: "ডেটা এক্সপোর্ট (CSV)"
+  },
+  en: {
+    dashboard: "Home", contacts: "People", history: "History", profile: "Profile",
+    welcome: "Welcome", youll_get: "You'll Get", youll_pay: "You'll Pay", net_balance: "Net Balance",
+    recent: "Recent Entries", see_all: "See All", no_entries: "No entries yet.",
+    add_contact: "Add New Person", contact_name: "Name", contact_phone: "Phone Number (Optional)",
+    pick_contact: "Pick from Contacts", save: "Save", owes_you: "Owes you", you_owe: "You owe", settled: "Settled",
+    gave: "Gave", took: "Took", amount_label: "Amount (৳)", note_label: "Note / Reason (Optional)", date_label: "Date", save_entry: "Save Entry",
+    entry_history: "Entry History", del: "Delete", edit_contact: "Edit", delete_contact: "Delete Person",
+    all: "All", search: "Search...", sort_date: "Sort: Date", sort_entry: "Sort: Entry",
+    change_pin: "Change PIN", danger: "Danger Zone", reset_all: "Reset Full History",
+    delete_account: "Delete Account & Data", logout: "Logout", lang_switch: "Switch to Bengali",
+    save_success: "Saved!", req_fields: "Name is required", req_entry_fields: "Enter a valid amount",
+    del_confirm_1: "Bulk Delete (1/2)", del_confirm_2: "Final Confirm (2/2)", enter_pin_cont: "Enter PIN to continue", enter_pin_perm: "Enter PIN again to permanently delete",
+    wrong_pin: "Incorrect PIN!", pin_length_err: "PIN must be 6 digits", old_pin_err: "Old PIN is incorrect", mismatch: "PIN mismatch!",
+    setting_pin: "Setting PIN...", pin_set_success: "PIN set successfully!", logging_in: "Logging in...", login_success: "Logged in successfully",
+    verifying: "Verifying...", deleted: "Deleted!", updating: "Updating...", error: "Error", old_pin_required: "Old PIN is required",
+    signed_in_as: "Signed in as", switch_account: "Switch Account", ledger_locked: "Ledger Locked", setup_pin_description: "Create a 6-digit PIN to protect your ledger.",
+    setup_security_pin: "Setup Security PIN", confirm_pin: "Confirm PIN", confirm_pin_desc: "Enter the same PIN again", verify_identity: "Please verify your identity to securely access your ledger.", unlock_ledger: "Unlock Ledger",
+    loading_data: "Loading data...", logging_out: "Logging out securely...",
+    forgot_pin_instruction: "Sign in again with the same account to reset your PIN.",
+    total_gave: "Total Gave", total_took: "Total Took", no_history: "No history yet", export_data: "Export Data (CSV)"
+  }
+};
+window._t = (key) => LANG[window.lang][key] || key;
+
+window.translateErr = (msg) => {
+  if (!msg) return _t('error');
+  const m = String(msg).toLowerCase();
+  if (m.includes('old_pin_required')) return _t('old_pin_required');
+  if (m.includes('incorrect') || m.includes('invalid login')) return _t('wrong_pin');
+  if (m.includes('old_pin_invalid')) return _t('old_pin_err');
+  if (m.includes('pin_length_err') || m.includes('length')) return _t('pin_length_err');
+  if (m.includes('mismatch')) return _t('mismatch');
+  if (m.includes('rate limit') || m.includes('exceeded')) return "Too many requests. Try again later.";
+  return msg;
+};
+
+window.withTimeout = (promise, ms, errorMsg = 'Request timed out') => {
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(errorMsg)), ms); });
+  return Promise.race([Promise.resolve(promise).finally(() => clearTimeout(timer)), timeoutPromise]);
+};
+
+const bnNum = (n) => window.lang === 'bn' ? String(Math.round(n)).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]) : Number(Math.round(n)).toLocaleString('en-US');
+const BN_MONTHS = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
+const EN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const formatDate = (dateObj) => {
+  if (window.lang === 'en') return `${EN_MONTHS[dateObj.getMonth()]} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+  return `${BN_MONTHS[dateObj.getMonth()]} ${bnNum(dateObj.getDate())}, ${bnNum(dateObj.getFullYear())}`;
+};
+const getLocalDateString = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const refId = () => Math.random().toString(36).substr(2,6).toUpperCase();
+const initials = (name) => (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+
+window.showToast = (msg, type='success') => {
+  const c = document.getElementById('toast-container'); const t = document.createElement('div');
+  let colors = type==='success' ? 'bg-brass text-[#101B2C]' : (type==='error' ? 'bg-oxblood text-white' : 'bg-steel text-white');
+  let icon = type==='success' ? 'check-circle' : (type==='error' ? 'alert-circle' : 'loader-2');
+  let spin = type==='info' ? 'animate-spin' : '';
+  t.className = `toast-in flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl ${colors} text-sm font-bold max-w-xs border border-white/10`;
+  t.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5 shrink-0 ${spin}"></i><span>${msg}</span>`;
+  c.appendChild(t); lucide.createIcons();
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(20px)'; t.style.transition='all .3s'; setTimeout(()=>t.remove(),300); }, type==='info' ? 1500 : 3200);
+};
+
+window.showModal = (html) => {
+  const mc = document.getElementById('modalContainer');
+  mc.innerHTML = `<div class="glass w-full max-w-sm rounded-lg p-6 border pop-in shadow-2xl relative my-auto max-h-[85vh] overflow-y-auto hide-scrollbar">${html}</div>`;
+  mc.classList.remove('hidden'); mc.classList.add('flex'); lucide.createIcons();
+  mc.onclick = (e)=>{ if(e.target===mc) window.hideModal(); };
+};
+window.hideModal = () => { const mc = document.getElementById('modalContainer'); mc.classList.add('hidden'); mc.classList.remove('flex'); };
+
+window.togglePw = (id) => {
+  const el = document.getElementById(id); const icon = document.getElementById(id+'-icon');
+  if(el.type === 'password'){ el.type = 'text'; icon.setAttribute('data-lucide', 'eye-off'); }
+  else { el.type = 'password'; icon.setAttribute('data-lucide', 'eye'); }
+  lucide.createIcons();
+};
+
+// ================= STATE =================
+window.supa = null; window.session = null; window.profile = null;
+window.activeTab = localStorage.getItem('ledger_tab') || 'dashboard';
+window.contacts = []; window.entries = []; window.CFG = {};
+window.authMode = 'login';
+window._pinVerified = false;
+window._pinFlowActive = false;
+window._pinModalOpen = false;
+window._isDataLoading = false;
+window._openContactId = null;
+window._historySearch = ''; window._historyFilter = 'all'; window._historySort = 'date';
+window._entryType = 'gave';
+window.adminToken = localStorage.getItem('ledger_admin_token') || null;
+window.logoTapCount = 0;
+window._manageView = 'users';
+window._manageUsers = []; window._isManageLoading = false; window._manageLoaded = false; window._manageError = null;
+window._manageFeedback = []; window._isFeedbackLoading = false; window._feedbackLoaded = false; window._feedbackError = null;
+window._feedbackRating = 0;
+window._myFeedback = []; window._myFeedbackUnreadCount = 0;
+window._feedbackOpen = false; window._fabDocked = false;
+
+function getIdentities() {
+  const identities = window.session?.user?.identities || [];
+  const gId = identities.find(i => i.provider === 'google');
+  const ghId = identities.find(i => i.provider === 'github');
+  return { identities, gId, ghId };
+}
+function getEmailChoice() { if (!window.session?.user?.id) return 'google'; return localStorage.getItem('ledger_email_choice_' + window.session.user.id) || 'google'; }
+function getDisplayEmail() {
+  const { gId, ghId } = getIdentities();
+  if (gId && ghId) { const choice = getEmailChoice(); if (choice === 'github') return ghId.identity_data.email || ghId.identity_data.user_name || ''; return gId.identity_data.email || ''; }
+  if (gId) return gId.identity_data.email || '';
+  if (ghId) return ghId.identity_data.email || ghId.identity_data.user_name || '';
+  return window.session?.user?.email || window.profile?.email || '';
+}
+
+// ================= PIN PAD =================
+let pinResolve, pinReject, pinEntered = '';
+window.askPin = async (title, subtitle='', showForgot=false) => {
+  if (window._pinModalOpen) throw new Error('cancelled');
+  window._pinModalOpen = true;
+  await new Promise(r => setTimeout(r, 150));
+  return new Promise((resolve, reject) => {
+    pinResolve = (val) => { window._pinModalOpen = false; resolve(val); };
+    pinReject = (err) => { window._pinModalOpen = false; reject(err); };
+    pinEntered = '';
+    const pc = document.getElementById('pinContainer');
+    pc.innerHTML = `
+    <div class="w-full max-w-md glass rounded-t-lg !border-t-[3px] !border-t-brass p-6 pb-8 pop-in relative">
+      <div class="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-6"></div>
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 bg-[#0B1420] border-2 border-amber rounded-full flex items-center justify-center mx-auto mb-3"><i data-lucide="lock-keyhole" class="w-6 h-6 text-amber"></i></div>
+        <h3 class="disp italic font-semibold text-xl tracking-tight">${title}</h3>
+        ${subtitle ? `<p class="text-xs text-slate-500 mt-1.5">${subtitle}</p>` : ''}
+      </div>
+      <div class="flex justify-center gap-3 mb-8" id="pinDots">${[0,1,2,3,4,5].map(i=>`<div class="dot" id="dot-${i}"></div>`).join('')}</div>
+      <div class="grid grid-cols-3 gap-3 max-w-[260px] mx-auto">
+        ${[1,2,3,4,5,6,7,8,9].map(n=>`<button type="button" class="key-btn py-4 rounded-lg bg-white/60 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 disp text-xl font-semibold shadow-sm" onclick="window.pinKey('${n}')">${n}</button>`).join('')}
+        <button type="button" class="key-btn py-4 rounded-lg text-slate-400 font-bold text-xs hover:text-slate-600 dark:hover:text-slate-200" onclick="window.pinKey('cancel')"><i data-lucide="x" class="w-6 h-6 mx-auto"></i></button>
+        <button type="button" class="key-btn py-4 rounded-lg bg-white/60 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 disp text-xl font-semibold shadow-sm" onclick="window.pinKey('0')">0</button>
+        <button type="button" class="key-btn py-4 rounded-lg text-oxblood flex items-center justify-center hover:bg-oxblood/10 transition-colors" onclick="window.pinKey('back')"><i data-lucide="delete" class="w-6 h-6"></i></button>
+      </div>
+      ${showForgot ? `<button onclick="window.forgotPin()" class="w-full text-center mt-6 text-[12px] font-bold text-slate-500 hover:text-steel transition-colors">Forgot PIN? Relogin to reset.</button>` : ''}
+    </div>`;
+    pc.classList.remove('hidden'); lucide.createIcons();
+  });
+};
+window.pinKey = (k) => {
+  if (k === 'cancel') { document.getElementById('pinContainer').classList.add('hidden'); pinReject(new Error('cancelled')); return; }
+  if (k === 'back') { pinEntered = pinEntered.slice(0,-1); }
+  else if (pinEntered.length < 6) { pinEntered += k; }
+  for(let i=0; i<6; i++) document.getElementById(`dot-${i}`).classList.toggle('filled', i < pinEntered.length);
+  if (pinEntered.length === 6) { setTimeout(() => { document.getElementById('pinContainer').classList.add('hidden'); pinResolve(pinEntered); }, 50); }
+};
+window.handlePinKeydown = (e) => {
+  if (document.getElementById('pinContainer').classList.contains('hidden')) return;
+  if (e.key >= '0' && e.key <= '9') window.pinKey(e.key);
+  else if (e.key === 'Backspace') window.pinKey('back');
+  else if (e.key === 'Escape') window.pinKey('cancel');
+};
+document.addEventListener('keydown', window.handlePinKeydown);
+window.forgotPin = async () => {
+  document.getElementById('pinContainer').classList.add('hidden');
+  window.showToast(_t('forgot_pin_instruction'), 'info');
+  if (window.session?.user?.id) localStorage.setItem('ledger_pending_pin_reset', window.session.user.id);
+  await window.switchAccount();
+};
+
+window.callApi = async (path, body) => {
+  const res = await window.withTimeout(fetch(path, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{}) }), 8000);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Server Error');
+  return json;
+};
+window.notify = (event, details) => { if (window.session) window.callApi('/api/notify', { event, accessToken: window.session.access_token, details }).catch(()=>{}); };
+window.adminApi = async (action, payload) => {
+  const res = await window.withTimeout(fetch('/api/admin', { method:'POST', headers:{'Content-Type':'application/json','x-admin-token':window.adminToken}, body: JSON.stringify({ action, payload: payload || {} }) }), 12000, 'Request timed out');
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed');
+  return json;
+};
+function badgeText(n){ return n > 9 ? '9+' : String(n); }
+function starsHtml(rating){
+  if (!rating) return '';
+  let out = '<div class="flex gap-0.5 justify-center mb-2">';
+  for (let i=1;i<=5;i++){ out += `<svg class="w-4 h-4 ${i<=rating?'text-amber':'text-slate-300 dark:text-slate-700'}" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg>`; }
+  out += '</div>'; return out;
+}
+
+function currentRedirectUrl() { if (window.isApp) return 'ledgerapp://callback'; return window.location.origin + window.location.pathname; }
+window.loginProvider = async (provider) => { window.showToast('Redirecting...', 'info'); await window.supa.auth.signInWithOAuth({ provider, options: { redirectTo: currentRedirectUrl() } }); };
+window.linkProvider = async (provider) => {
+  window.showToast('Redirecting...', 'info');
+  const { error } = await window.supa.auth.linkIdentity({ provider, options: { redirectTo: currentRedirectUrl() } });
+  if (error) window.showToast(translateErr(error.message), 'error');
+};
+
+window._switchingAccount = false;
+window.switchAccount = async () => {
+  if (window._switchingAccount) return;
+  window._switchingAccount = true;
+  window._pinFlowActive = false; window._pinModalOpen = false;
+  const pinContainer = document.getElementById('pinContainer'); if (pinContainer) pinContainer.classList.add('hidden');
+  window.session = null; window.profile = null; window.contacts = []; window.entries = []; window._pinVerified = false; window.authMode = 'login';
+  window.adminToken = null; localStorage.removeItem('ledger_admin_token');
+  localStorage.removeItem('ledger_pending_delete');
+  hideBoot();
+  const root = document.getElementById('root');
+  if (root) root.innerHTML = `<div class="p-10 text-center w-full mt-20 fade-in"><div class="w-10 h-10 border-4 border-brass border-t-transparent rounded-full animate-spin mx-auto mb-4"></div><p class="font-bold text-slate-500">${_t('logging_out')}</p></div>`;
+  try { if (window.supa) await window.withTimeout(window.supa.auth.signOut({ scope: 'local' }), 3000, 'Sign out timed out'); } catch (e) {}
+  if (typeof window.ultimateTimeout !== 'undefined') clearTimeout(window.ultimateTimeout);
+  window._switchingAccount = false;
+  window.render();
+};
+window.logout = window.switchAccount;
+
+window.loadProfile = async () => {
+  const session = window.session;
+  if (!session?.user?.id) return false;
+  const userId = session.user.id;
+  try {
+    const { data, error } = await window.withTimeout(window.supa.from('profiles').select('*').eq('id', userId).maybeSingle(), 5000, 'Profile request timed out');
+    if (error) throw error;
+    if (data) { if (window.session?.user?.id === userId) window.profile = data; return true; }
+    const st = await window.callApi('/api/pin', { action: 'status', accessToken: session.access_token }).catch(()=>({pin_set:false, is_suspended:false}));
+    window.profile = { id: userId, full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User', email: session.user.email || '', avatar_url: session.user.user_metadata?.avatar_url || '', pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: null };
+    await window.supa.from('profiles').upsert({ id: userId, full_name: window.profile.full_name, email: window.profile.email, avatar_url: window.profile.avatar_url }).catch(()=>{});
+    return true;
+  } catch(e) {
+    const st = await window.callApi('/api/pin', { action: 'status', accessToken: session.access_token }).catch(()=>({pin_set:false, is_suspended:false}));
+    window.profile = { id: userId, full_name: session.user.user_metadata?.full_name || 'User', email: session.user.email || '', avatar_url: session.user.user_metadata?.avatar_url || '', pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: null };
+    return true;
+  }
+};
+
+window.loadData = async (silent = false) => {
+  const userId = window.session?.user?.id;
+  if (!userId) return false;
+  window._isDataLoading = true;
+  if (window.session) window.render();
+  try {
+    const [cRes, eRes] = await Promise.all([
+      window.supa.from('contacts').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+      window.supa.from('entries').select('*').eq('user_id', userId).order('entry_date', { ascending: false }).order('created_at', { ascending: false })
+    ]);
+    if (cRes.error) throw cRes.error;
+    if (eRes.error) throw eRes.error;
+    if (!window.session || window.session.user.id !== userId) return false;
+    window.contacts = cRes.data || [];
+    window.entries = eRes.data || [];
+    return true;
+  } catch (e) {
+    if (!silent && window.session) window.showToast(translateErr(e.message), 'error');
+    return false;
+  } finally {
+    window._isDataLoading = false;
+    if (window.session && window.session.user.id === userId) window.render();
+  }
+};
+
+// ================= BALANCE HELPERS =================
+function contactStats(contactId) {
+  const rows = window.entries.filter(e => e.contact_id === contactId);
+  const gave = rows.filter(e=>e.type==='gave').reduce((s,e)=>s+Number(e.amount),0);
+  const took = rows.filter(e=>e.type==='took').reduce((s,e)=>s+Number(e.amount),0);
+  return { gave, took, net: gave - took, count: rows.length };
+}
+function overallStats() {
+  let get = 0, pay = 0;
+  window.contacts.forEach(c => { const { net } = contactStats(c.id); if (net > 0) get += net; else pay += Math.abs(net); });
+  return { get, pay, net: get - pay };
+}
+
+// ================= RENDER =================
+window.render = () => {
+  const root = document.getElementById('root');
+  if (!window.session) { root.innerHTML = buildLanding(); lucide.createIcons(); return; }
+  if (window.profile && window.profile.is_suspended) { root.innerHTML = buildSuspended(); lucide.createIcons(); return; }
+
+  if (window.profile && (!window.profile.pin_set || !window._pinVerified)) {
+    const isSetup = !window.profile.pin_set;
+    root.innerHTML = `
+      <div class="flex-1 flex flex-col items-center justify-center h-full w-full bg-[#F1EAD6] dark:bg-[#0B1420] ruled px-4 py-8 overflow-y-auto">
+        <div class="w-full max-w-md text-center fade-in m-auto">
+          ${getAccountBar()}
+          <div class="w-20 h-20 bg-[#0B1420] dark:bg-[#101E32] border-2 border-${isSetup?'brass':'amber'} rounded-full flex items-center justify-center mx-auto mb-6">
+            <i data-lucide="${isSetup?'lock-keyhole':'lock'}" class="w-9 h-9 text-${isSetup?'brass':'amber'}"></i>
+          </div>
+          <h2 class="disp italic text-3xl font-semibold mb-3 tracking-tight">${_t('ledger_locked')}</h2>
+          <p class="text-sm text-slate-500 mb-8 font-medium px-4">${isSetup ? _t('setup_pin_description') : _t('verify_identity')}</p>
+          <button onclick="${isSetup ? 'window.forceSetPin()' : 'window.verifyPinAccess()'}" class="w-full py-4 bg-brass text-[#101B2C] rounded-lg font-bold shadow-lg shadow-brass/20 active:scale-95 transition-all text-[15px] flex items-center justify-center gap-2">
+            <i data-lucide="${isSetup ? 'key-round' : 'unlock'}" class="w-5 h-5"></i> ${isSetup ? _t('setup_security_pin') : _t('unlock_ledger')}
+          </button>
+        </div>
+      </div>`;
+    lucide.createIcons();
+    return;
+  }
+
+  root.innerHTML = buildShell(buildTabContent());
+  lucide.createIcons(); updateNav(); attachFabDrag();
+  if (window.activeTab === 'contacts' || window._openContactId) {
+    document.documentElement.style.setProperty('--focus-color', window._entryType === 'gave' ? '#C9A961' : '#B8402E');
+    document.documentElement.style.setProperty('--focus-ring', window._entryType === 'gave' ? 'rgba(201,169,97,0.4)' : 'rgba(184,64,46,0.4)');
+  } else {
+    document.documentElement.style.setProperty('--focus-color', '#C9A961');
+    document.documentElement.style.setProperty('--focus-ring', 'rgba(201,169,97,0.4)');
+  }
+};
+
+window.switchAuthMode = (mode) => { window.authMode = mode; window.render(); };
+
+function getDevCreditBar() {
+  return `
+  <div class="w-full bg-slate-200 dark:bg-[#101014] text-slate-700 dark:text-white border-b border-slate-300 dark:border-white/5 py-1.5 md:py-2.5 px-3 md:px-4 flex flex-wrap justify-center items-center gap-x-2 gap-y-0.5 text-[9px] md:text-[11px] font-bold z-50 shadow-sm md:shadow-md shrink-0 transition-colors">
+    <span>Developed by <a href="${window.CFG?.developerLinkedin || '#'}" class="text-brass hover:text-emerald-600 dark:hover:text-brass hover:underline transition-colors">Rahat</a></span>
+    <span class="opacity-40 hidden xs:inline">&bull;</span>
+    <a href="${window.CFG?.developerGithub || '#'}" class="flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-slate-300 transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> GitHub
+    </a>
+  </div>`;
+}
+
+function buildLanding() {
+  return `
+  <div class="flex-1 w-full flex flex-col justify-between relative bg-[#F1EAD6] dark:bg-[#0B1420] ruled min-h-[100dvh]">
+    <div class="flex-1 flex flex-col items-center justify-center px-4 py-8 max-w-md mx-auto w-full z-10">
+      <div class="flex flex-col items-center text-center fade-in mb-8 shrink-0 w-full mt-auto">
+        <div class="w-20 h-20 rounded-full bg-[#0B1420] dark:bg-[#101E32] border-[3px] border-brass flex items-center justify-center shadow-xl mb-5"><i data-lucide="feather" class="w-9 h-9 text-brass"></i></div>
+        <p class="text-[10px] font-bold uppercase tracking-[0.3em] text-brass mb-1">Private Account Book</p>
+        <h1 class="disp italic text-5xl font-bold mb-3 tracking-tight text-slate-800 dark:text-[#EDE6D2] leading-none">Ledger</h1>
+        <p class="text-sm text-slate-600 dark:text-slate-400 font-medium px-4">A quiet place to keep track of who owes you, and who you owe.</p>
+        ${(!window.isApp && window.CFG?.apkUrl) ? `<div class="mt-4"><a href="${window.CFG.apkUrl}" class="px-6 py-3 bg-brass text-[#101B2C] rounded-lg font-bold text-sm shadow-lg shadow-brass/20 flex items-center justify-center gap-2 max-w-[200px] mx-auto active:scale-95 transition-all"><i data-lucide="download" class="w-4 h-4"></i> Install App</a></div>` : ''}
+      </div>
+      <div class="w-full shrink-0 fade-in pop-in pb-4 mb-auto">
+        <div class="glass rounded-lg w-full flex flex-col items-center relative shadow-xl border-t-[3px] !border-t-brass overflow-hidden">
+          <div class="pt-8 px-8 md:px-10 pb-8 md:pb-10 w-full flex flex-col items-center">
+          <h3 class="disp italic font-semibold text-xl mb-1 text-center">Open your ledger</h3>
+          <p class="text-xs text-slate-500 mb-6 text-center">Sign in — every account keeps its own private book</p>
+          <div class="grid grid-cols-1 gap-3 w-full">
+            <button onclick="window.loginProvider('google')" class="flex items-center justify-center gap-2 bg-white dark:bg-white/5 text-slate-800 dark:text-white px-4 py-3.5 rounded-lg font-bold shadow-sm active:scale-95 transition-all border border-slate-200 dark:border-white/10 text-sm hover:bg-slate-50 dark:hover:bg-white/10">
+              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.11C3.25 21.3 7.31 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.9 12c0-.79.14-1.56.37-2.28V6.61H1.27A11.98 11.98 0 0 0 0 12c0 1.94.46 3.77 1.27 5.39l4-3.11z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.7 1.27 6.61l4 3.11C6.22 6.86 8.87 4.75 12 4.75z"/></svg> Continue with Google
+            </button>
+            <button onclick="window.loginProvider('github')" class="flex items-center justify-center gap-2 bg-[#0B1420] dark:bg-white/5 text-white px-4 py-3.5 rounded-lg font-bold shadow-sm active:scale-95 transition-all text-sm hover:bg-black dark:hover:bg-white/10 border border-transparent dark:border-white/10">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> Continue with GitHub
+            </button>
+          </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="w-full shrink-0 flex justify-center fade-in pb-6 pt-2">
+       <div class="px-4 py-2 rounded-lg bg-white/50 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 text-[10px] font-bold text-slate-500 flex items-center gap-2 shadow-sm">
+         Developed by <a href="${window.CFG?.developerLinkedin || '#'}" class="text-brass hover:underline">Rahat</a>
+         <span>&bull;</span>
+         <a href="${window.CFG?.developerGithub || '#'}" class="flex items-center gap-1 hover:text-slate-700 dark:hover:text-white transition-colors">
+           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> GitHub
+         </a>
+       </div>
+    </div>
+  </div>`;
+}
+
+function getAccountBar() {
+  const p = window.profile || {}; const s = window.session;
+  if (!s?.user) return '';
+  const email = getDisplayEmail();
+  const name = p.full_name || s.user.user_metadata?.full_name || s.user.user_metadata?.name || 'User';
+  const avatar = p.avatar_url || s.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
+  return `
+    <div class="w-full max-w-sm mx-auto mb-6 px-4 py-3 rounded-lg bg-white/60 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center gap-3 text-left shadow-sm">
+      <img src="${avatar}" class="w-10 h-10 rounded-full border-2 border-brass/30 object-cover shrink-0">
+      <div class="min-w-0 flex-1">
+        <p class="text-[9px] uppercase tracking-widest text-slate-400 font-bold">${_t('signed_in_as')}</p>
+        <p class="text-xs font-bold truncate text-slate-800 dark:text-white">${name}</p>
+        <p class="text-[10px] text-slate-500 truncate">${email}</p>
+      </div>
+      <button onclick="window.switchAccount()" class="px-3 py-2 rounded-lg bg-slate-800 dark:bg-white text-white dark:text-slate-900 text-[10px] font-bold shadow-sm shrink-0">${_t('switch_account')}</button>
+    </div>`;
+}
+
+function buildSuspended(){
+  const reason = window.profile?.suspend_reason || (window.lang==='bn' ? 'শর্তাবলী লঙ্ঘন।' : 'Violation of terms.');
+  const waLink = window.CFG?.developerWhatsapp || '#';
+  return `<div class="flex-1 flex flex-col items-center justify-center px-6 text-center fade-in">
+    <div class="w-16 h-16 rounded-full bg-oxblood/10 text-oxblood flex items-center justify-center mb-5 border border-oxblood/20"><i data-lucide="shield-off" class="w-8 h-8"></i></div>
+    <h2 class="disp text-2xl font-bold mb-2">Account Suspended</h2>
+    <div class="bg-oxblood/5 border border-oxblood/10 rounded-lg p-4 mb-6 max-w-sm w-full">
+       <p class="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Reason</p>
+       <p class="text-sm text-slate-700 dark:text-slate-300 font-medium">${reason}</p>
+    </div>
+    <a href="${waLink}" class="w-full max-w-xs py-3.5 px-8 bg-brass text-[#101B2C] rounded-lg font-bold shadow-lg shadow-brass/20 active:scale-95 transition-all flex items-center justify-center gap-2 mb-3"><i data-lucide="message-circle" class="w-5 h-5"></i> Contact Developer</a>
+    <button type="button" onclick="window.switchAccount()" class="w-full max-w-xs py-3.5 px-8 glass-input rounded-lg font-bold shadow-sm text-slate-600 dark:text-slate-300">Logout</button>
+  </div>`;
+}
+
+window.handleLogoTap = () => {
+  const adminEmail = window.CFG?.superAdminEmail?.toLowerCase().trim();
+  const userEmail = (getDisplayEmail() || '').toLowerCase().trim();
+  if (!adminEmail || !userEmail || adminEmail !== userEmail) return;
+  window.logoTapCount++;
+  if (window.logoTapCount >= 5) { window.logoTapCount = 0; window.openMasterKeyModal(); }
+  setTimeout(()=>{ window.logoTapCount = 0; }, 2500);
+};
+
+window.openMasterKeyModal = () => {
+  window.showModal(`
+    <div class="text-center mb-6"><div class="w-14 h-14 bg-steel/10 text-steel rounded-full flex items-center justify-center mx-auto mb-3 border border-steel/20"><i data-lucide="key-round" class="w-7 h-7"></i></div><h3 class="disp text-2xl font-bold tracking-tight">Master Key</h3></div>
+    <input type="password" id="masterKeyInput" class="w-full p-4 rounded-lg glass-input text-lg text-center tracking-widest font-mono outline-none dyn-focus shadow-inner" placeholder="••••••••">
+    <div class="flex gap-3 mt-6"><button type="button" onclick="window.hideModal()" class="flex-1 py-4 text-sm glass-input rounded-lg font-bold active:scale-95 transition-transform">Cancel</button><button type="button" id="mk-ok" class="flex-1 py-4 text-sm bg-steel text-white rounded-lg font-bold shadow-lg shadow-steel/30 active:scale-95 transition-transform">Enter</button></div>
+  `);
+  document.getElementById('mk-ok').onclick = async () => {
+    try {
+      const masterKey = document.getElementById('masterKeyInput').value; window.showToast('Verifying...', 'info');
+      const json = await window.callApi('/api/master-verify', { masterKey, accessToken: window.session.access_token });
+      window.adminToken = json.token; localStorage.setItem('ledger_admin_token', json.token); window.hideModal(); window.changeTab('manage');
+      window.loadManageFeedback();
+    } catch(e){ window.showToast(translateErr(e.message), 'error'); }
+  };
+};
+window.exitAdmin = () => { window.adminToken = null; localStorage.removeItem('ledger_admin_token'); window.changeTab('dashboard'); };
+
+function buildShell(innerHtml) {
+  const p = window.profile || {}; const isSuper = window.adminToken;
+  const manageUnread = window._manageFeedback.filter(f=>!f.is_read).length;
+  const navItems = [
+    { id: 'dashboard', icon: 'layout-dashboard', label: _t('dashboard'), badge: 0 },
+    { id: 'contacts', icon: 'users', label: _t('contacts'), badge: 0 },
+    { id: 'history', icon: 'history', label: _t('history'), badge: 0 },
+    ...(isSuper ? [{ id: 'manage', icon: 'shield', label: 'Manage', badge: manageUnread }] : []),
+    { id: 'profile', icon: 'user-circle', label: _t('profile'), badge: window._myFeedbackUnreadCount }
+  ];
+  const navButtons = navItems.map(n => `
+    <button class="nav-btn w-full md:w-auto md:px-4 flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 flex-1 md:flex-none py-1.5 md:py-3.5 mx-0.5 md:mx-0 md:mb-2 transition-all md:rounded-lg outline-none" onclick="window.changeTab('${n.id}')" data-tab="${n.id}">
+      <span class="relative inline-block">
+        <i data-lucide="${n.icon}" class="w-5 h-5"></i>
+        ${n.badge > 0 ? `<span ${n.id==='profile'?'id="navProfileBadge"':''} class="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-oxblood text-white text-[8px] font-bold flex items-center justify-center leading-none">${badgeText(n.badge)}</span>` : ''}
+      </span>
+      <span class="text-[9px] md:text-[13px] disp font-bold uppercase md:capitalize tracking-wider md:tracking-normal">${n.label}</span>
+    </button>`).join('');
+
+  return `
+  <div class="flex w-full h-[100dvh] overflow-hidden bg-[#F1EAD6] dark:bg-[#0B1420] ruled">
+    <aside class="hidden md:flex flex-col w-64 bg-[#FFFDF7] dark:bg-[#0F1E31] border-r-[3px] border-brass/70 z-50 p-4 shrink-0">
+      <div class="flex items-center gap-3 cursor-pointer select-none mb-10 mt-2 px-2" onclick="window.handleLogoTap()">
+        <div class="w-10 h-10 rounded-full bg-[#0B1420] border-2 border-brass flex items-center justify-center shrink-0"><i data-lucide="feather" class="w-4.5 h-4.5 text-brass"></i></div>
+        <div><h1 class="disp italic text-xl font-bold leading-none tracking-tight">Ledger</h1><p class="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-1">Private Account Book</p></div>
+      </div>
+      <div class="flex-1 flex flex-col">${navButtons}</div>
+    </aside>
+
+    <div class="flex-1 flex flex-col relative h-full overflow-hidden">
+      <header class="bg-[#FFFDF7] dark:bg-[#0F1E31] sticky top-0 z-40 border-b-[3px] border-brass/70 md:hidden">
+        <div class="max-w-3xl mx-auto flex justify-between items-center gap-2 px-4 py-3">
+          <div class="flex items-center gap-3 cursor-pointer select-none" onclick="window.handleLogoTap()">
+            <div class="w-9 h-9 rounded-full bg-[#0B1420] border-2 border-brass flex items-center justify-center shrink-0"><i data-lucide="feather" class="w-4 h-4 text-brass"></i></div>
+            <div><h1 class="disp italic text-lg font-bold leading-none tracking-tight">Ledger</h1></div>
+          </div>
+          <div class="flex items-center gap-4">
+            <button type="button" onclick="window.toggleTheme()" class="relative w-14 h-7 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center px-1 cursor-pointer transition-colors border border-slate-300 dark:border-slate-600 shadow-inner">
+              <i data-lucide="moon" class="absolute right-1.5 w-4 h-4 text-slate-400"></i>
+              <i data-lucide="sun" class="absolute left-1.5 w-4 h-4 text-amber-500"></i>
+              <div class="themeSlider w-5 h-5 bg-white rounded-full shadow-md z-10 transform transition-transform duration-300"></div>
+            </button>
+            <img src="${p.avatar_url || 'https://api.dicebear.com/7.x/initials/svg?seed='+encodeURIComponent(p.full_name||'U')}" class="w-9 h-9 rounded-full object-cover border-2 border-brass cursor-pointer shadow-sm" onclick="window.changeTab('profile')">
+          </div>
+        </div>
+      </header>
+      ${getDevCreditBar()}
+      <main class="flex-1 overflow-y-auto w-full pb-28 md:pb-10 pt-4 px-4 md:px-8 fade-in hide-scrollbar relative block h-full">
+        <div class="max-w-4xl mx-auto">${innerHtml}</div>
+      </main>
+      ${buildFeedbackFab()}
+      <nav class="md:hidden fixed bottom-0 inset-x-0 bg-[#FFFDF7] dark:bg-[#0F1E31] border-t-[3px] border-brass/70 z-40" style="padding-bottom:env(safe-area-inset-bottom)">
+        <div class="flex justify-around items-center h-[64px] px-1.5 max-w-md mx-auto">${navButtons}</div>
+      </nav>
+    </div>
+  </div>`;
+}
+
+function updateNav() {
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    const on = b.dataset.tab === window.activeTab;
+    if(on){ b.classList.add('text-brass'); b.classList.remove('text-slate-400'); b.style.boxShadow = 'inset 0 2px 0 0 #C9A961'; }
+    else { b.classList.remove('text-brass'); b.classList.add('text-slate-400'); b.style.boxShadow = 'none'; }
+  });
+  const htmlDark = document.documentElement.classList.contains('dark');
+  document.querySelectorAll('.themeSlider').forEach(el => el.classList.toggle('translate-x-[26px]', htmlDark));
+}
+window.changeTab = (tab) => { if (tab === 'manage' && !window.adminToken) return; window._openContactId = null; window.activeTab = tab; localStorage.setItem('ledger_tab', tab); window.render(); };
+window.toggleTheme = () => { const html = document.documentElement; html.classList.toggle('dark'); localStorage.setItem('ledger_theme', html.classList.contains('dark') ? 'dark' : 'light'); updateNav(); };
+
+function buildTabContent() {
+  if (window._openContactId) return buildContactDetail(window._openContactId);
+  if (window.activeTab === 'dashboard') return buildDashboard();
+  if (window.activeTab === 'contacts') return buildContacts();
+  if (window.activeTab === 'history') return buildHistory();
+  if (window.activeTab === 'profile') return buildProfile();
+  if (window.activeTab === 'manage' && window.adminToken) return buildManage();
+  return buildDashboard();
+}
+
+// ================= DASHBOARD =================
+function buildDashboard() {
+  const p = window.profile || {};
+  const { get, pay, net } = overallStats();
+  const recent = window.entries.slice(0, 6);
+  return `
+  <div class="glass rounded-lg !border-t-[3px] !border-t-brass p-6 md:p-8 relative overflow-hidden mb-6 mt-2">
+    <p class="text-brass font-bold text-[10px] uppercase tracking-[0.25em] mb-1.5">${formatDate(new Date())}</p>
+    <h2 class="disp italic text-[26px] md:text-3xl font-semibold mb-1 tracking-tight">${_t('welcome')}, ${(p.full_name||'User').split(' ')[0]}</h2>
+    <p class="text-[13px] text-slate-500 font-medium">${window.contacts.length} ${window.lang==='bn'?'জন যুক্ত আছে':'people in your book'}</p>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-6">
+    ${statCard(_t('youll_get'), '৳ '+bnNum(get), 'arrow-down-left', 'brass', "window.changeTab('contacts')")}
+    ${statCard(_t('youll_pay'), '৳ '+bnNum(pay), 'arrow-up-right', 'oxblood', "window.changeTab('contacts')")}
+    <div class="col-span-2 md:col-span-1 glass rounded-lg p-5 relative overflow-hidden !border-t-[3px] ${net>=0?'!border-t-brass':'!border-t-oxblood'} cursor-pointer transition-transform active:scale-[0.98]" onclick="window.changeTab('contacts')">
+      <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500 block mb-1">${_t('net_balance')}</span>
+      <h3 class="text-2xl md:text-3xl font-semibold disp italic ${net>=0?'text-brass':'text-oxblood'} relative z-10 tracking-tight mono">${net>=0?'+':'−'}৳ ${bnNum(Math.abs(net))}</h3>
+    </div>
+  </div>
+  <div class="glass rounded-lg overflow-hidden">
+    <div class="p-4 border-b border-slate-900/10 dark:border-white/10 flex items-center justify-between">
+      <div class="flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-brass"></i><h3 class="font-semibold disp italic text-sm">${_t('recent')}</h3></div>
+      <button type="button" onclick="window.changeTab('history')" class="text-[11px] font-bold text-brass hover:underline">${_t('see_all')}</button>
+    </div>
+    <div class="divide-y divide-slate-900/[0.06] dark:divide-white/[0.06]">
+      ${window._isDataLoading && window.entries.length === 0
+        ? `<div class="p-10 text-center text-slate-500 text-sm font-medium"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto mb-2"></i>${_t('loading_data')}</div>`
+        : (recent.map(entryRow).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">${_t('no_entries')}</div>`)}
+    </div>
+  </div>`;
+}
+function statCard(label, value, icon, tone, onClick) {
+  return `<div onclick="${onClick}" class="glass rounded-lg p-5 relative overflow-hidden !border-t-[3px] !border-t-${tone} cursor-pointer transition-transform active:scale-[0.98]">
+    <i data-lucide="${icon}" class="w-4 h-4 text-${tone} mb-3"></i>
+    <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500 block mb-1">${label}</span>
+    <h3 class="text-[20px] font-semibold disp italic relative z-10 tracking-tight mono">${value}</h3>
+  </div>`;
+}
+function entryRow(e) {
+  const isGave = e.type === 'gave'; const d = new Date(e.entry_date);
+  const c = window.contacts.find(x=>x.id===e.contact_id);
+  return `<div class="ledger-rule ${isGave?'border-l-brass':'border-l-oxblood'} p-4 flex items-center gap-3 hover:bg-slate-900/[0.03] dark:hover:bg-white/[0.03] transition-colors cursor-pointer" onclick="window.openContact('${e.contact_id}')">
+    <div class="w-9 h-9 rounded-full ${isGave?'bg-brass/10 text-brass':'bg-oxblood/10 text-oxblood'} flex items-center justify-center shrink-0"><i data-lucide="${isGave?'arrow-down-left':'arrow-up-right'}" class="w-4 h-4"></i></div>
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-1.5">
+        <p class="text-[13px] font-semibold truncate">${c ? c.name : 'Unknown'}</p>
+        ${e.note ? `<i data-lucide="info" onclick="event.stopPropagation();window.showNoteInfo('${e.id}')" class="w-3.5 h-3.5 text-steel hover:text-brass cursor-pointer shrink-0"></i>` : ''}
+      </div>
+      <p class="text-[10px] text-slate-500 font-medium mono mt-0.5">${isGave?_t('gave'):_t('took')} &bull; ${formatDate(d)}</p>
+    </div>
+    <span class="font-semibold mono tracking-tight text-sm ${isGave?'text-brass':'text-oxblood'}">${isGave?'+':'−'}৳ ${bnNum(e.amount)}</span>
+  </div>`;
+}
+window.showNoteInfo = (id) => {
+  const e = window.entries.find(x => x.id === id); if(!e) return;
+  const c = window.contacts.find(x=>x.id===e.contact_id);
+  const isGave = e.type === 'gave';
+  window.showModal(`
+    <div class="relative text-left p-2">
+      <button onclick="window.hideModal()" class="absolute -top-4 -right-4 p-2 text-slate-400 hover:text-rose-500 transition-colors rounded-full bg-slate-100 dark:bg-white/5"><i data-lucide="x" class="w-4 h-4"></i></button>
+      <div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${window.lang==='bn'?'সাথে':'With'}</p><p class="text-[15px] font-semibold text-slate-800 dark:text-white">${c?c.name:'Unknown'}</p></div>
+      <div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${_t('note_label')}</p>
+        <div class="bg-slate-100 dark:bg-white/5 p-3 rounded-lg border border-slate-200 dark:border-white/10"><p class="text-[13px] text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap leading-relaxed">${e.note||'-'}</p></div>
+      </div>
+      <div><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${_t('amount_label')}</p><p class="text-xl font-semibold mono tracking-tight ${isGave ? 'text-brass' : 'text-oxblood'}">${isGave ? '+' : '−'}৳ ${bnNum(e.amount)}</p></div>
+    </div>`);
+};
+
+// ================= CONTACTS =================
+function buildContacts() {
+  const sorted = window.contacts.slice().sort((a,b)=> Math.abs(contactStats(b.id).net) - Math.abs(contactStats(a.id).net));
+  return `
+  <div class="flex items-center justify-between mb-4 mt-2">
+    <h2 class="disp italic text-2xl font-semibold flex items-center gap-2 tracking-tight">${_t('contacts')}</h2>
+    <button type="button" onclick="window.openContactModal()" class="px-4 py-2.5 rounded-lg bg-brass text-[#101B2C] text-xs font-bold shadow-md flex items-center gap-1.5 active:scale-95 transition-transform"><i data-lucide="user-plus" class="w-4 h-4"></i> ${_t('add_contact')}</button>
+  </div>
+  <div class="glass rounded-lg overflow-hidden">
+    <div class="divide-y divide-slate-900/[0.06] dark:divide-white/[0.06]">
+      ${window._isDataLoading && window.contacts.length === 0
+        ? `<div class="p-10 text-center text-slate-500 text-sm font-medium"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto mb-2"></i>${_t('loading_data')}</div>`
+        : (sorted.map(contactRow).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">${_t('no_entries')}</div>`)}
+    </div>
+  </div>`;
+}
+function contactRow(c) {
+  const { net } = contactStats(c.id);
+  let badge, tone;
+  if (net > 0) { badge = _t('owes_you'); tone = 'brass'; }
+  else if (net < 0) { badge = _t('you_owe'); tone = 'oxblood'; }
+  else { badge = _t('settled'); tone = 'steel'; }
+  return `<div class="ledger-rule border-l-${tone} p-4 flex items-center gap-3 hover:bg-slate-900/[0.03] dark:hover:bg-white/[0.03] transition-colors cursor-pointer" onclick="window.openContact('${c.id}')">
+    <div class="w-10 h-10 rounded-full bg-[#0B1420] dark:bg-white/5 border border-brass/40 flex items-center justify-center shrink-0 font-semibold text-[11px] disp text-brass">${initials(c.name)}</div>
+    <div class="min-w-0 flex-1">
+      <p class="text-[14px] font-semibold truncate">${c.name}</p>
+      <p class="text-[10px] text-slate-500 font-medium mt-0.5">${c.phone || (window.lang==='bn'?'নাম্বার নেই':'No phone')}</p>
+    </div>
+    <div class="text-right shrink-0 flex flex-col items-end gap-1">
+      <span class="stamp text-${tone} text-[8px] px-2.5 py-1">${badge}</span>
+      ${net !== 0 ? `<span class="font-semibold mono text-sm text-${tone}">৳ ${bnNum(Math.abs(net))}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+window.openContactModal = (id) => {
+  const c = id ? window.contacts.find(x=>x.id===id) : null;
+  const hasContactPicker = !!(navigator.contacts && navigator.contacts.select);
+  window.showModal(`
+    <div class="text-left">
+      <h3 class="disp font-bold text-xl mb-4">${c ? _t('edit_contact') : _t('add_contact')}</h3>
+      ${(!c && hasContactPicker) ? `<button type="button" onclick="window.pickDeviceContact()" class="w-full mb-4 py-3.5 rounded-lg bg-steel/10 text-steel border border-steel/20 font-bold text-[13px] flex items-center justify-center gap-2"><i data-lucide="contact" class="w-4 h-4"></i> ${_t('pick_contact')}</button>` : ''}
+      <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('contact_name')} *</label>
+      <input id="modal-c-name" value="${c?.name||''}" class="w-full px-4 py-3.5 rounded-lg glass-input dyn-focus text-[14px] outline-none mb-4" placeholder="e.g. Rahim Uddin">
+      <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('contact_phone')}</label>
+      <input id="modal-c-phone" type="tel" value="${c?.phone||''}" class="w-full px-4 py-3.5 rounded-lg glass-input dyn-focus text-[14px] outline-none mb-5" placeholder="01XXXXXXXXX">
+      <div class="flex gap-3">
+        <button onclick="window.hideModal()" class="flex-1 py-3 bg-slate-200 dark:bg-white/10 rounded-lg font-bold active:scale-95 transition-transform">Cancel</button>
+        <button onclick="window.saveContact(${c ? `'${c.id}'` : 'null'})" class="flex-1 py-3 bg-brass text-[#101B2C] rounded-lg font-bold shadow-lg shadow-brass/20 active:scale-95 transition-transform">${_t('save')}</button>
+      </div>
+    </div>`);
+};
+
+window.pickDeviceContact = async () => {
+  try {
+    const props = ['name', 'tel'];
+    const contacts = await navigator.contacts.select(props, { multiple: false });
+    if (contacts && contacts.length) {
+      const c = contacts[0];
+      const nameEl = document.getElementById('modal-c-name');
+      const phoneEl = document.getElementById('modal-c-phone');
+      if (nameEl && c.name && c.name[0]) nameEl.value = c.name[0];
+      if (phoneEl && c.tel && c.tel[0]) phoneEl.value = c.tel[0];
+    }
+  } catch(e) { window.showToast('Contact picker not available', 'error'); }
+};
+
+window.saveContact = async (id) => {
+  const name = document.getElementById('modal-c-name').value.trim();
+  const phone = document.getElementById('modal-c-phone').value.trim();
+  if (!name) return window.showToast(_t('req_fields'), 'error');
+  window.showToast(_t('updating'), 'info');
+  try {
+    if (id) {
+      const { error } = await window.supa.from('contacts').update({ name, phone: phone || null }).eq('id', id);
+      if (error) throw error;
+      const c = window.contacts.find(x=>x.id===id); if (c) { c.name = name; c.phone = phone; }
+    } else {
+      const row = { user_id: window.session.user.id, name, phone: phone || null };
+      const { data, error } = await window.supa.from('contacts').insert([row]).select();
+      if (error) throw error;
+      if (data && data[0]) window.contacts.unshift(data[0]);
+      window.notify('contact_add', { contact_name: name });
+    }
+    window.hideModal(); window.showToast(_t('save_success')); window.render();
+  } catch(e) { window.showToast(translateErr(e.message), 'error'); }
+};
+
+// ================= CONTACT DETAIL =================
+window.openContact = (id) => { window._openContactId = id; window._entryType = 'gave'; window.render(); };
+window.closeContact = () => { window._openContactId = null; window.render(); };
+
+function buildContactDetail(id) {
+  const c = window.contacts.find(x=>x.id===id);
+  if (!c) { window._openContactId = null; return buildContacts(); }
+  const { gave, took, net } = contactStats(id);
+  const rows = window.entries.filter(e=>e.contact_id===id);
+  const isGave = window._entryType === 'gave';
+  const badge = net > 0 ? { txt: _t('owes_you'), tone:'brass' } : (net < 0 ? { txt: _t('you_owe'), tone:'oxblood' } : { txt: _t('settled'), tone:'steel' });
+  const todayStr = getLocalDateString();
+
+  return `
+  <div class="flex items-center gap-3 mb-4 mt-2">
+    <button onclick="window.closeContact()" class="p-2.5 rounded-lg glass-input"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+    <div class="w-11 h-11 rounded-full bg-[#0B1420] dark:bg-white/5 border border-brass/40 flex items-center justify-center shrink-0 font-semibold text-sm disp text-brass">${initials(c.name)}</div>
+    <div class="min-w-0 flex-1">
+      <h2 class="disp italic text-lg font-semibold truncate">${c.name}</h2>
+      <p class="text-[10px] text-slate-500">${c.phone || (window.lang==='bn'?'নাম্বার নেই':'No phone')}</p>
+    </div>
+    <button onclick="window.openContactModal('${c.id}')" class="p-2.5 rounded-lg glass-input text-slate-500"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+    <button onclick="window.deleteContact('${c.id}')" class="p-2.5 rounded-lg bg-oxblood/10 text-oxblood"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+  </div>
+
+  <div class="grid grid-cols-3 gap-2 mb-5">
+    <div class="glass rounded-lg p-3 text-center"><p class="text-[9px] font-bold uppercase text-slate-500 mb-1">${_t('total_gave')}</p><p class="font-semibold text-brass mono text-sm">৳${bnNum(gave)}</p></div>
+    <div class="glass rounded-lg p-3 text-center"><p class="text-[9px] font-bold uppercase text-slate-500 mb-1">${_t('total_took')}</p><p class="font-semibold text-oxblood mono text-sm">৳${bnNum(took)}</p></div>
+    <div class="glass rounded-lg p-3 text-center flex flex-col items-center justify-center"><span class="stamp text-${badge.tone} text-[7px] px-2 py-1 mb-1">${badge.txt}</span><p class="font-semibold text-${badge.tone} mono text-sm">৳${bnNum(Math.abs(net))}</p></div>
+  </div>
+
+  <div class="glass rounded-lg p-5 mb-5">
+    <div class="flex gap-0 border-b-2 border-slate-900/10 dark:border-white/10 mb-4">
+      <button type="button" onclick="window.setEntryType('gave')" class="flex-1 py-2.5 font-semibold text-[13px] transition-all border-b-2 -mb-0.5 ${isGave?'border-brass text-brass':'border-transparent text-slate-500'}">${_t('gave')}</button>
+      <button type="button" onclick="window.setEntryType('took')" class="flex-1 py-2.5 font-semibold text-[13px] transition-all border-b-2 -mb-0.5 ${!isGave?'border-oxblood text-oxblood':'border-transparent text-slate-500'}">${_t('took')}</button>
+    </div>
+    <div class="flex items-end gap-3 mb-3">
+      <div class="flex-1">
+        <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('amount_label')}</label>
+        <div class="relative"><span class="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">৳</span>
+        <input id="entryAmount" type="number" placeholder="0.00" class="w-full pl-10 pr-4 py-3 rounded-lg glass-input dyn-focus text-base font-semibold outline-none mono"></div>
+      </div>
+      <div class="w-[64px] shrink-0">
+        <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block text-center">${window.lang==='bn'?'তারিখ':'DATE'}</label>
+        <input id="entryDate" type="date" value="${todayStr}" class="w-full px-1 py-3 rounded-lg glass-input dyn-focus text-[11px] font-bold outline-none text-center">
+      </div>
+    </div>
+    <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('note_label')}</label>
+    <input id="entryNote" type="text" placeholder="..." class="w-full px-4 py-3 rounded-lg glass-input dyn-focus text-[13px] font-medium outline-none mb-4">
+    <button type="button" id="entrySaveBtn" onclick="window.submitEntry('${c.id}')" class="w-full py-3.5 rounded-lg ${isGave?'bg-brass text-[#101B2C]':'bg-oxblood text-white'} font-bold shadow-lg active:scale-[0.98] transition-all disp italic tracking-wide text-[15px] flex items-center justify-center gap-2"><i data-lucide="check" class="w-5 h-5"></i> ${_t('save_entry')}</button>
+  </div>
+
+  <h3 class="disp italic text-base font-semibold mb-3">${_t('entry_history')}</h3>
+  <div class="glass rounded-lg overflow-hidden">
+    <div class="divide-y divide-slate-900/[0.06] dark:divide-white/[0.06]">
+      ${rows.map(e => `<div class="ledger-rule ${e.type==='gave'?'border-l-brass':'border-l-oxblood'} p-4 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full ${e.type==='gave'?'bg-brass/10 text-brass':'bg-oxblood/10 text-oxblood'} flex items-center justify-center shrink-0"><i data-lucide="${e.type==='gave'?'arrow-down-left':'arrow-up-right'}" class="w-4 h-4"></i></div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-1.5"><p class="text-[13px] font-semibold truncate">${e.type==='gave'?_t('gave'):_t('took')}</p>${e.note?`<i data-lucide="info" onclick="window.showNoteInfo('${e.id}')" class="w-3.5 h-3.5 text-steel cursor-pointer shrink-0"></i>`:''}</div>
+          <p class="text-[10px] text-slate-500 font-medium mono mt-0.5">#${e.ref_id||''} &bull; ${formatDate(new Date(e.entry_date))}</p>
+        </div>
+        <div class="text-right shrink-0">
+          <span class="font-semibold mono block tracking-tight text-sm ${e.type==='gave'?'text-brass':'text-oxblood'}">${e.type==='gave'?'+':'−'}৳ ${bnNum(e.amount)}</span>
+          <button type="button" onclick="window.deleteEntry('${e.id}')" class="text-[10px] text-slate-400 hover:text-oxblood font-bold mt-1.5 transition-colors">${_t('del')}</button>
+        </div>
+      </div>`).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">${_t('no_entries')}</div>`}
+    </div>
+  </div>`;
+}
+window.setEntryType = (type) => { window._entryType = type; window.render(); };
+
+window.submitEntry = async (contactId) => {
+  const btn = document.getElementById('entrySaveBtn'); if(!btn) return;
+  const og = btn.innerHTML; btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>'; btn.disabled = true; lucide.createIcons();
+  try {
+    const amount = Number(document.getElementById('entryAmount').value);
+    if (!amount || amount <= 0) throw new Error(_t('req_entry_fields'));
+    const row = { user_id: window.session.user.id, contact_id: contactId, type: window._entryType, amount, note: document.getElementById('entryNote').value || null, entry_date: document.getElementById('entryDate').value, ref_id: refId() };
+    const { data, error } = await window.supa.from('entries').insert([row]).select();
+    if (error) throw error;
+    if (data && data[0]) window.entries.unshift(data[0]);
+    const c = window.contacts.find(x=>x.id===contactId);
+    window.notify('entry_add', { type: row.type, amount: row.amount, contact_name: c?.name || '', ref_id: row.ref_id });
+    window.showToast(_t('save_success'));
+    ['entryAmount','entryNote'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    window.render();
+  } catch(e) { window.showToast(translateErr(e.message), 'error'); }
+  finally { const freshBtn = document.getElementById('entrySaveBtn'); if (freshBtn) { freshBtn.disabled = false; lucide.createIcons(); } }
+};
+
+window.deleteEntry = async (id) => {
+  try {
+    const pin = await window.askPin(window.lang==='bn'?'ডিলিট কনফার্ম করুন':'Confirm Delete', window.lang==='bn'?'ডিলিট করতে পিন দিন':'Enter PIN to delete');
+    window.showToast(_t('verifying'), 'info');
+    await window.callApi('/api/pin', { action:'verify', pin, accessToken: window.session.access_token });
+    const e = window.entries.find(x=>x.id===id);
+    const { error } = await window.supa.from('entries').delete().eq('id', id);
+    if (error) throw error;
+    window.entries = window.entries.filter(x=>x.id!==id);
+    if (e) window.notify('entry_delete', { ref_id: e.ref_id, amount: e.amount });
+    window.showToast(_t('deleted')); window.render();
+  } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
+};
+
+window.deleteContact = async (id) => {
+  try {
+    const pin = await window.askPin(_t('del_confirm_1'), _t('enter_pin_cont'));
+    window.showToast(_t('verifying'), 'info');
+    await window.callApi('/api/pin', { action:'verify', pin, accessToken: window.session.access_token });
+    const c = window.contacts.find(x=>x.id===id);
+    const { error } = await window.supa.from('contacts').delete().eq('id', id);
+    if (error) throw error;
+    window.contacts = window.contacts.filter(x=>x.id!==id);
+    window.entries = window.entries.filter(x=>x.contact_id!==id);
+    if (c) window.notify('contact_delete', { contact_name: c.name });
+    window._openContactId = null;
+    window.showToast(_t('deleted')); window.render();
+  } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
+};
+
+// ================= HISTORY =================
+function buildHistory() {
+  let list = window.entries.filter(e => window._historyFilter==='all' || e.type===window._historyFilter);
+  if (window._historySearch) {
+    const q = window._historySearch.toLowerCase();
+    list = list.filter(e => {
+      const c = window.contacts.find(x=>x.id===e.contact_id);
+      return ((c?.name||'')+' '+(e.ref_id||'')+' '+(e.note||'')).toLowerCase().includes(q);
+    });
+  }
+  list = list.slice();
+  if (window._historySort === 'entry') list.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  else list.sort((a,b)=>(new Date(b.entry_date)-new Date(a.entry_date)) || (new Date(b.created_at)-new Date(a.created_at)));
+
+  return `
+  <h2 class="disp text-2xl font-extrabold mb-4 flex items-center gap-2 tracking-tight mt-2"><i data-lucide="history" class="w-6 h-6 text-brass"></i> ${_t('history')}</h2>
+  <div class="flex gap-2 mb-3">
+    ${['all','gave','took'].map(f=>`<button type="button" onclick="window._historyFilter='${f}'; window.render();" class="px-4 py-2 rounded-lg text-[11px] font-bold border transition-colors ${window._historyFilter===f?'bg-brass text-[#101B2C] border-brass':'bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'}">${f==='all'?_t('all'):(f==='gave'?_t('gave'):_t('took'))}</button>`).join('')}
+    <div class="relative flex-1"><i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-slate-400"></i>
+    <input oninput="window._historySearch=this.value; window.render();" value="${window._historySearch}" placeholder="${_t('search')}" class="w-full pl-9 pr-3 py-2 rounded-lg glass-input dyn-focus text-xs font-medium outline-none shadow-inner"></div>
+  </div>
+  <div class="flex gap-2 mb-4">
+    <button onclick="window._historySort='date'; window.render();" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${window._historySort==='date'?'bg-steel text-white border-steel':'bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'}">${_t('sort_date')}</button>
+    <button onclick="window._historySort='entry'; window.render();" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${window._historySort==='entry'?'bg-steel text-white border-steel':'bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'}">${_t('sort_entry')}</button>
+  </div>
+  <div class="glass rounded-lg overflow-hidden shadow-sm">
+    <div class="divide-y divide-slate-100/50 dark:divide-white/5">
+      ${window._isDataLoading && window.entries.length===0
+        ? `<div class="p-10 text-center text-slate-500 text-sm font-medium"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto mb-2"></i>${_t('loading_data')}</div>`
+        : (list.map(entryRow).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">${_t('no_history')}</div>`)}
+    </div>
+  </div>`;
+}
+
+// ================= PROFILE =================
+function buildProfile() {
+  const p = window.profile || {};
+  const { gId, ghId } = getIdentities();
+  const bothLinked = !!(gId && ghId);
+  const choice = getEmailChoice();
+  return `
+  <h2 class="disp text-2xl font-extrabold mb-5 flex items-center gap-2 tracking-tight mt-2"><i data-lucide="user-circle" class="w-6 h-6 text-brass"></i> ${_t('profile')}</h2>
+  <div class="glass rounded-lg p-6 mb-5 text-center shadow-sm relative">
+    <button onclick="window.openNameModal()" class="absolute top-4 right-4 p-2 bg-white/50 dark:bg-white/10 rounded-lg shadow-sm text-slate-500 hover:text-brass transition-colors"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+    <div class="relative w-24 h-24 mx-auto mb-3">
+      <img src="${p.avatar_url || 'https://api.dicebear.com/7.x/initials/svg?seed='+encodeURIComponent(p.full_name||'U')}" class="w-24 h-24 rounded-full object-cover border-4 border-brass/30 shadow-md">
+      <button type="button" onclick="document.getElementById('avatarInput').click()" class="absolute bottom-0 right-0 w-8 h-8 bg-brass text-[#101B2C] rounded-full flex items-center justify-center border-2 border-white dark:border-[#0B1420] shadow-lg active:scale-95 transition-transform"><i data-lucide="camera" class="w-4 h-4"></i></button>
+      <input type="file" id="avatarInput" accept="image/*" class="hidden" onchange="window.initCropper(event)">
+    </div>
+    <h3 class="disp text-xl font-bold tracking-tight">${p.full_name || 'User'}</h3>
+    <p class="text-xs text-slate-500 font-medium mt-0.5">${getDisplayEmail()}</p>
+    ${bothLinked ? `<div class="flex justify-center gap-2 mt-3">
+      <button onclick="window.chooseEmail('google')" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${choice==='google'?'bg-brass text-[#101B2C] border-brass':'bg-white/40 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'}">Use Google email</button>
+      <button onclick="window.chooseEmail('github')" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${choice==='github'?'bg-brass text-[#101B2C] border-brass':'bg-white/40 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'}">Use GitHub email</button>
+    </div>` : ''}
+  </div>
+
+  <div class="glass rounded-lg p-5 mb-5 shadow-sm">
+    <h4 class="text-[10px] font-bold uppercase text-slate-400 mb-4 tracking-widest">Linked Accounts</h4>
+    <div class="space-y-3">
+      ${gId ? `<div class="flex items-center gap-3 bg-white/40 dark:bg-white/5 p-3 rounded-lg border border-white/20 dark:border-white/5">
+        <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.11C3.25 21.3 7.31 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.9 12c0-.79.14-1.56.37-2.28V6.61H1.27A11.98 11.98 0 0 0 0 12c0 1.94.46 3.77 1.27 5.39l4-3.11z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.7 1.27 6.61l4 3.11C6.22 6.86 8.87 4.75 12 4.75z"/></svg>
+        <div class="min-w-0 flex-1"><p class="text-xs font-bold text-slate-800 dark:text-white">Google</p><p class="text-[10px] text-slate-500 truncate">${gId.identity_data.email}</p></div>
+        <button onclick="window.unlinkProvider('google')" class="text-[10px] font-bold text-oxblood hover:bg-oxblood/10 px-2 py-1.5 rounded-lg transition-colors shrink-0">Unlink</button>
+      </div>` : `<button onclick="window.linkProvider('google')" class="flex items-center gap-3 bg-white/40 dark:bg-white/5 p-3 rounded-lg border border-white/20 dark:border-white/5 w-full hover:bg-white/60 dark:hover:bg-white/10 transition-colors text-slate-600 dark:text-slate-300"><svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.11C3.25 21.3 7.31 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.9 12c0-.79.14-1.56.37-2.28V6.61H1.27A11.98 11.98 0 0 0 0 12c0 1.94.46 3.77 1.27 5.39l4-3.11z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.7 1.27 6.61l4 3.11C6.22 6.86 8.87 4.75 12 4.75z"/></svg> <span class="text-xs font-bold">+ Link Google Account</span></button>`}
+      ${ghId ? `<div class="flex items-center gap-3 bg-white/40 dark:bg-white/5 p-3 rounded-lg border border-white/20 dark:border-white/5">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="text-slate-800 dark:text-white"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        <div class="min-w-0 flex-1"><p class="text-xs font-bold text-slate-800 dark:text-white">GitHub</p><p class="text-[10px] text-slate-500 truncate">${ghId.identity_data.email || ghId.identity_data.user_name || ''}</p></div>
+        <button onclick="window.unlinkProvider('github')" class="text-[10px] font-bold text-oxblood hover:bg-oxblood/10 px-2 py-1.5 rounded-lg transition-colors shrink-0">Unlink</button>
+      </div>` : `<button onclick="window.linkProvider('github')" class="flex items-center gap-3 bg-white/40 dark:bg-white/5 p-3 rounded-lg border border-white/20 dark:border-white/5 w-full hover:bg-white/60 dark:hover:bg-white/10 transition-colors text-slate-600 dark:text-slate-300"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> <span class="text-xs font-bold">+ Link GitHub Account</span></button>`}
+    </div>
+  </div>
+
+  <div class="glass rounded-lg p-5 mb-5 space-y-3 shadow-sm">
+    <button type="button" onclick="window.openMyFeedback()" class="w-full py-3.5 glass-input rounded-lg font-bold text-[13px] flex items-center justify-center gap-2 hover:bg-white/60 dark:hover:bg-white/10 transition-colors shadow-sm relative">
+      <i data-lucide="message-square-text" class="w-4 h-4 text-steel"></i> My Feedback
+      ${window._myFeedbackUnreadCount > 0 ? `<span id="myFeedbackBadge" class="ml-1 px-2 py-0.5 rounded-full bg-oxblood text-white text-[10px] font-bold">${badgeText(window._myFeedbackUnreadCount)}</span>` : ''}
+    </button>
+    <button type="button" onclick="window.lang=window.lang==='bn'?'en':'bn'; localStorage.setItem('ledger_lang',window.lang); document.documentElement.lang=window.lang; window.render();" class="w-full py-3.5 glass-input rounded-lg font-bold text-[13px] flex items-center justify-center gap-2 hover:bg-white/60 dark:hover:bg-white/10 transition-colors shadow-sm"><i data-lucide="languages" class="w-4 h-4 text-steel"></i> ${_t('lang_switch')}</button>
+    <button type="button" onclick="window.changePin()" class="w-full py-3.5 glass-input rounded-lg font-bold text-[13px] flex items-center justify-center gap-2 hover:bg-white/60 dark:hover:bg-white/10 transition-colors shadow-sm"><i data-lucide="key-round" class="w-4 h-4 text-amber"></i> ${_t('change_pin')}</button>
+    <button type="button" onclick="window.exportData()" class="w-full py-3.5 glass-input rounded-lg font-bold text-[13px] flex items-center justify-center gap-2 hover:bg-white/60 dark:hover:bg-white/10 transition-colors shadow-sm"><i data-lucide="download" class="w-4 h-4 text-brass"></i> ${_t('export_data')}</button>
+    ${(!window.isApp && window.CFG?.apkUrl) ? `<a href="${window.CFG.apkUrl}" class="w-full py-3.5 bg-brass text-[#101B2C] rounded-lg font-bold text-[13px] flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"><i data-lucide="download" class="w-4 h-4"></i> Install App</a>` : ''}
+  </div>
+
+  <div class="glass border border-oxblood/20 rounded-lg p-5 mb-6 shadow-sm relative overflow-hidden">
+    <div class="absolute inset-0 bg-oxblood/5 pointer-events-none"></div>
+    <h3 class="font-bold disp mb-3 text-oxblood flex items-center gap-2 relative z-10"><i data-lucide="alert-triangle" class="w-4 h-4"></i> ${_t('danger')}</h3>
+    <div class="space-y-3 relative z-10">
+      <button type="button" onclick="window.fullReset()" class="w-full py-3 bg-oxblood/10 text-oxblood border border-oxblood/20 rounded-lg font-bold text-[12px] hover:bg-oxblood/20 transition-colors">${_t('reset_all')}</button>
+      <button type="button" onclick="window.reqDeleteAccount()" class="w-full py-3 bg-red-600 text-white rounded-lg font-bold text-[12px] shadow-lg shadow-red-600/30 active:scale-[0.98] transition-all">${_t('delete_account')}</button>
+    </div>
+  </div>
+  <button type="button" onclick="window.switchAccount()" class="w-full py-4 bg-slate-800 dark:bg-white text-white dark:text-slate-900 rounded-lg font-bold flex items-center justify-center gap-2 mb-6 shadow-lg active:scale-[0.98] transition-all"><i data-lucide="log-out" class="w-4 h-4"></i> ${_t('logout')}</button>`;
+}
+
+window.openNameModal = () => {
+  window.showModal(`
+    <div class="text-center">
+      <h3 class="disp font-bold text-xl mb-4">Edit Name</h3>
+      <input type="text" id="modal-name-input" value="${window.profile.full_name || ''}" class="w-full px-4 py-3.5 rounded-lg glass-input dyn-focus text-[14px] outline-none mb-4 text-center">
+      <div class="flex gap-3">
+        <button onclick="window.hideModal()" class="flex-1 py-3 bg-slate-200 dark:bg-white/10 rounded-lg font-bold active:scale-95 transition-transform">Cancel</button>
+        <button onclick="window.saveName()" class="flex-1 py-3 bg-brass text-[#101B2C] rounded-lg font-bold shadow-lg shadow-brass/20 active:scale-95 transition-transform">Save Name</button>
+      </div>
+    </div>`);
+};
+window.saveName = async () => {
+  const newName = document.getElementById('modal-name-input').value;
+  if(!newName || newName.trim() === '') return window.showToast('Name cannot be empty', 'error');
+  window.hideModal(); window.showToast(_t('updating'), 'info');
+  const { error } = await window.supa.auth.updateUser({ data: { full_name: newName } });
+  if(error) return window.showToast(translateErr(error.message), 'error');
+  await window.supa.from('profiles').update({ full_name: newName }).eq('id', window.session.user.id).catch(()=>{});
+  await window.loadProfile(); window.render(); window.showToast('Name updated');
+};
+window.chooseEmail = (provider) => { if (!window.session?.user?.id) return; localStorage.setItem('ledger_email_choice_' + window.session.user.id, provider); window.render(); };
+window.unlinkProvider = async (provider) => {
+  try {
+    const { identities } = getIdentities();
+    if (identities.length <= 1) { window.showToast('Cannot unlink your only linked account', 'error'); return; }
+    const identity = identities.find(i => i.provider === provider); if (!identity) return;
+    const pin = await window.askPin('Confirm Unlink', `Enter PIN to unlink ${provider === 'google' ? 'Google' : 'GitHub'}`);
+    window.showToast(_t('verifying'), 'info');
+    await window.callApi('/api/pin', { action:'verify', pin, accessToken: window.session.access_token });
+    const { error } = await window.supa.auth.unlinkIdentity(identity);
+    if (error) throw error;
+    const currentChoice = getEmailChoice();
+    if (currentChoice === provider) { const other = provider === 'google' ? 'github' : 'google'; localStorage.setItem('ledger_email_choice_' + window.session.user.id, other); }
+    const { data: { session: freshSession } } = await window.supa.auth.getSession();
+    if (freshSession) window.session = freshSession;
+    window.showToast('Account unlinked'); window.render();
+  } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
+};
+
+window.exportData = async () => {
+  try {
+    if (!window.entries.length) { window.showToast('No data to export', 'error'); return; }
+    const headers = ['contact_name','type','amount','note','entry_date','ref_id'];
+    const rows = window.entries.map(e => {
+      const c = window.contacts.find(x=>x.id===e.contact_id);
+      const vals = [c?c.name:'', e.type, e.amount, e.note||'', e.entry_date, e.ref_id||''];
+      return vals.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const filename = `ledger_export_${getLocalDateString()}.csv`;
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    window.showToast('Exported!');
+  } catch(e) { window.showToast('Export failed', 'error'); }
+};
+
+window.forceSetPin = async (isReset = false) => {
+  if (window._pinFlowActive) return;
+  if (!isReset && window.profile?.pin_set) { window._pinVerified = true; localStorage.setItem('ledger_pin_verified_' + window.session.user.id, 'true'); window.render(); return; }
+  window._pinFlowActive = true;
+  try {
+    const p1 = await window.askPin(_t('setup_security_pin'), _t('setup_pin_description'));
+    if (!p1) return;
+    const p2 = await window.askPin(_t('confirm_pin'), _t('confirm_pin_desc'));
+    if (!p2) return;
+    if (p1 !== p2) { window.showToast(_t('mismatch'), 'error'); return; }
+    window.showToast(_t('setting_pin'), 'info');
+    await window.callApi('/api/pin', { action: isReset ? 'reset' : 'set', pin: p1, accessToken: window.session.access_token });
+    if(window.profile) window.profile.pin_set = true;
+    window._pinVerified = true;
+    localStorage.setItem('ledger_pin_verified_' + window.session.user.id, 'true');
+    window.showToast(_t('pin_set_success'), 'success'); window.render();
+  } catch(e) {
+    if (e.message && e.message.includes('PIN already exists')) { if (window.profile) window.profile.pin_set = true; window.render(); }
+    else if (e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error');
+  } finally { window._pinFlowActive = false; }
+};
+window.verifyPinAccess = async () => {
+  if (window._pinFlowActive) return; window._pinFlowActive = true;
+  try {
+    const pin = await window.askPin('Enter PIN', 'Unlock Ledger', true); if(!pin) return;
+    await window.callApi('/api/pin', { action:'verify', pin, accessToken: window.session.access_token });
+    window._pinVerified = true; localStorage.setItem('ledger_pin_verified_' + window.session.user.id, 'true'); window.render();
+  } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
+  finally { window._pinFlowActive = false; }
+};
+window.changePin = async () => {
+  if (window._pinFlowActive) return; window._pinFlowActive = true;
+  try {
+    const oldPin = await window.askPin('Enter Old PIN'); if(!oldPin) return;
+    const p1 = await window.askPin('Enter New PIN'); if(!p1) return;
+    const p2 = await window.askPin('Confirm New PIN'); if(!p2) return;
+    if (p1 !== p2) { window.showToast(_t('mismatch'), 'error'); return; }
+    window.showToast(_t('updating'), 'info');
+    await window.callApi('/api/pin', { action:'change', pin:p1, oldPin, accessToken: window.session.access_token });
+    window.showToast('PIN Changed');
+  } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
+  finally { window._pinFlowActive = false; }
+};
+window.fullReset = async () => {
+  if (window._pinFlowActive) return; window._pinFlowActive = true;
+  try {
+    const pin1 = await window.askPin(_t('del_confirm_1'), _t('enter_pin_cont')); if(!pin1) return;
+    const pin2 = await window.askPin(_t('del_confirm_2'), _t('enter_pin_perm')); if(!pin2) return;
+    if(pin1 !== pin2) { window.showToast(_t('mismatch'), 'error'); return; }
+    window.showToast(_t('verifying'), 'info');
+    await window.callApi('/api/pin', { action:'verify', pin: pin1, accessToken: window.session.access_token });
+    await window.supa.from('entries').delete().eq('user_id', window.session.user.id);
+    await window.supa.from('contacts').delete().eq('user_id', window.session.user.id);
+    window.contacts = []; window.entries = [];
+    window.notify('full_reset', {});
+    window.showToast(_t('deleted')); window.render();
+  } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
+  finally { window._pinFlowActive = false; }
+};
+window.reqDeleteAccount = async () => {
+  if (window._pinFlowActive) return; window._pinFlowActive = true;
+  try {
+    const pin1 = await window.askPin(_t('del_confirm_1'), _t('enter_pin_cont')); if(!pin1) return;
+    const pin2 = await window.askPin(_t('del_confirm_2'), _t('enter_pin_perm')); if(!pin2) return;
+    if(pin1 !== pin2) { window.showToast(_t('mismatch'), 'error'); return; }
+    window.showToast(_t('verifying'), 'info');
+    await window.callApi('/api/pin', { action:'verify', pin: pin1, accessToken: window.session.access_token });
+    await window.callApi('/api/pin', { action:'delete_account', accessToken: window.session.access_token });
+    window.showToast(_t('deleted'));
+    await window.switchAccount();
+  } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
+  finally { window._pinFlowActive = false; }
+};
+
+// ================= AVATAR CROPPER (simple pointer-based) =================
+let cropState = { img: null, scale: 1, dx: 0, dy: 0, dragging: false, px: 0, py: 0, pointers: [], initDist: 0, initScale: 1 };
+window.initCropper = (e) => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  if (file.size > 2*1024*1024) return window.showToast('Max size 2MB', 'error');
+  const reader = new FileReader();
+  const modal = document.getElementById('cropperModal');
+  modal.classList.remove('hidden'); modal.classList.add('flex'); modal.style.opacity = '0';
+  reader.onload = (ev) => {
+    const img = document.getElementById('cropperImg'); cropState.img = img;
+    img.onload = () => {
+      setTimeout(() => {
+        const area = document.getElementById('cropperArea'); const boxSize = 260;
+        cropState.scale = Math.max(boxSize / img.naturalWidth, boxSize / img.naturalHeight);
+        const zoom = document.getElementById('cropZoom');
+        zoom.min = cropState.scale; zoom.max = cropState.scale * 3; zoom.step = 0.01; zoom.value = cropState.scale;
+        cropState.dx = (area.clientWidth - (img.naturalWidth * cropState.scale)) / 2;
+        cropState.dy = (area.clientHeight - (img.naturalHeight * cropState.scale)) / 2;
+        applyBounds(); updateCropView(); modal.style.opacity = '1';
+      }, 50);
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+function updateCropView(){ cropState.img.style.transform = `translate(${cropState.dx}px, ${cropState.dy}px) scale(${cropState.scale})`; }
+function applyBounds() {
+  const minScale = Math.max(260 / cropState.img.naturalWidth, 260 / cropState.img.naturalHeight);
+  if (cropState.scale < minScale) cropState.scale = minScale;
+  const area = document.getElementById('cropperArea');
+  const cx = area.clientWidth / 2; const cy = area.clientHeight / 2;
+  const maxDx = cx - 130; const minDx = cx + 130 - (cropState.img.naturalWidth * cropState.scale);
+  const maxDy = cy - 130; const minDy = cy + 130 - (cropState.img.naturalHeight * cropState.scale);
+  if (cropState.dx > maxDx) cropState.dx = maxDx; if (cropState.dx < minDx) cropState.dx = minDx;
+  if (cropState.dy > maxDy) cropState.dy = maxDy; if (cropState.dy < minDy) cropState.dy = minDy;
+}
+document.getElementById('cropZoom').addEventListener('input', e => {
+  const oldScale = cropState.scale; cropState.scale = parseFloat(e.target.value);
+  const area = document.getElementById('cropperArea'); const cx = area.clientWidth / 2; const cy = area.clientHeight / 2;
+  cropState.dx = cx - (cx - cropState.dx) * (cropState.scale / oldScale);
+  cropState.dy = cy - (cy - cropState.dy) * (cropState.scale / oldScale);
+  applyBounds(); updateCropView();
+});
+const cArea = document.getElementById('cropperArea');
+cArea.addEventListener('pointerdown', e => {
+  cropState.pointers.push(e);
+  if (cropState.pointers.length === 2) { cropState.initDist = Math.hypot(cropState.pointers[0].clientX - cropState.pointers[1].clientX, cropState.pointers[0].clientY - cropState.pointers[1].clientY); cropState.initScale = cropState.scale; }
+  else if (cropState.pointers.length === 1) { cropState.dragging = true; cropState.px = e.clientX; cropState.py = e.clientY; cArea.setPointerCapture(e.pointerId); }
+});
+cArea.addEventListener('pointermove', e => {
+  const index = cropState.pointers.findIndex(p => p.pointerId === e.pointerId); if (index !== -1) cropState.pointers[index] = e;
+  if (cropState.pointers.length === 2) {
+    const dist = Math.hypot(cropState.pointers[0].clientX - cropState.pointers[1].clientX, cropState.pointers[0].clientY - cropState.pointers[1].clientY);
+    const zoomFactor = dist / cropState.initDist; const oldScale = cropState.scale; let newScale = cropState.initScale * zoomFactor;
+    const minScale = Math.max(260 / cropState.img.naturalWidth, 260 / cropState.img.naturalHeight);
+    if(newScale < minScale) newScale = minScale; cropState.scale = newScale;
+    const cx = cArea.clientWidth / 2; const cy = cArea.clientHeight / 2;
+    cropState.dx = cx - (cx - cropState.dx) * (cropState.scale / oldScale); cropState.dy = cy - (cy - cropState.dy) * (cropState.scale / oldScale);
+    applyBounds(); updateCropView(); document.getElementById('cropZoom').value = cropState.scale;
+  } else if (cropState.dragging && cropState.pointers.length === 1) {
+    cropState.dx += (e.clientX - cropState.px); cropState.dy += (e.clientY - cropState.py); cropState.px = e.clientX; cropState.py = e.clientY; applyBounds(); updateCropView();
+  }
+});
+const handlePointerUp = e => {
+  cropState.pointers = cropState.pointers.filter(p => p.pointerId !== e.pointerId);
+  if (cropState.pointers.length === 1) { cropState.px = cropState.pointers[0].clientX; cropState.py = cropState.pointers[0].clientY; }
+  if(cropState.pointers.length === 0) { cropState.dragging = false; try{cArea.releasePointerCapture(e.pointerId);}catch(err){} }
+};
+cArea.addEventListener('pointerup', handlePointerUp); cArea.addEventListener('pointercancel', handlePointerUp);
+window.closeCropper = () => { document.getElementById('cropperModal').classList.add('hidden'); document.getElementById('cropperModal').classList.remove('flex'); };
+window.doCrop = () => {
+  const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512; const ctx = canvas.getContext('2d'); const area = document.getElementById('cropperArea');
+  const sX = ((area.clientWidth/2 - 130) - cropState.dx) / cropState.scale; const sY = ((area.clientHeight/2 - 130) - cropState.dy) / cropState.scale;
+  const sW = 260 / cropState.scale; const sH = 260 / cropState.scale; ctx.drawImage(cropState.img, sX, sY, sW, sH, 0, 0, 512, 512);
+  canvas.toBlob(async (blob) => {
+    window.closeCropper(); window.showToast('Uploading...', 'info');
+    try {
+      const path = `${window.session.user.id}/avatar_${Date.now()}.jpg`;
+      const { error: upErr } = await window.supa.storage.from('avatars').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+      if (upErr) throw upErr;
+      const { data: pub } = window.supa.storage.from('avatars').getPublicUrl(path);
+      const { error: profErr } = await window.supa.from('profiles').update({ avatar_url: pub.publicUrl }).eq('id', window.session.user.id);
+      if (profErr) throw profErr;
+      await window.loadProfile(); window.render(); window.showToast('Avatar updated!');
+    } catch(err){ window.showToast(translateErr(err.message), 'error'); }
+  }, 'image/jpeg', 0.9);
+};
+
+// ================= FEEDBACK FAB =================
+function buildFeedbackFab(){
+  return `
+  <div id="feedbackFabWrap" class="md:hidden fixed z-40 flex flex-col items-end" style="right:20px; bottom:96px;">
+    <div id="fabLabel" class="mb-2" style="opacity:0; transition:opacity .3s ease;"><span class="px-3 py-1 rounded-full bg-slate-900/80 dark:bg-black/70 text-white text-[10px] font-bold whitespace-nowrap">Feedback</span></div>
+    <div id="feedbackSubButtons" class="flex flex-col items-end gap-3 mb-3 opacity-0 translate-y-4 pointer-events-none transition-all duration-300">
+      <button onclick="window.openWhatsappFeedback()" class="w-12 h-12 rounded-full bg-[#25D366] shadow-lg flex items-center justify-center active:scale-90 transition-transform" title="WhatsApp">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.3-1.39a9.9 9.9 0 0 0 4.69 1.19h.01c5.46 0 9.9-4.45 9.9-9.91C21.96 6.45 17.5 2 12.04 2zm5.79 14.02c-.24.68-1.4 1.3-1.93 1.35-.49.05-1.11.07-1.79-.12-.41-.12-.94-.29-1.62-.57-2.85-1.23-4.71-4.09-4.85-4.28-.14-.19-1.16-1.54-1.16-2.94s.73-2.09.99-2.38c.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.57.81 1.98.88 2.13.07.14.12.31.02.5-.1.19-.15.31-.29.48-.14.17-.3.37-.43.5-.14.14-.29.29-.13.57.17.29.75 1.24 1.62 2.01 1.11.99 2.05 1.3 2.34 1.44.29.14.46.12.63-.07.17-.19.71-.83.9-1.11.19-.29.38-.24.64-.14.26.1 1.66.78 1.94.92.29.14.48.21.55.33.07.12.07.7-.17 1.38z"/></svg>
+      </button>
+      <button onclick="window.openInAppFeedback()" class="w-12 h-12 rounded-full bg-steel shadow-lg flex items-center justify-center active:scale-90 transition-transform" title="Send Feedback">
+        <i data-lucide="message-square-text" class="w-5 h-5 text-white"></i>
+      </button>
+    </div>
+    <button id="feedbackMainBtn" class="w-14 h-14 rounded-full bg-brass/55 backdrop-blur-md shadow-xl flex items-center justify-center active:scale-90 transition-transform touch-none border border-white/25">
+      <i data-lucide="message-circle" id="feedbackMainIcon" class="w-6 h-6 text-[#101B2C]"></i>
+    </button>
+  </div>`;
+}
+function updateFabUI(){
+  const wrap = document.getElementById('feedbackFabWrap'); if (!wrap) return;
+  const sub = document.getElementById('feedbackSubButtons'); const label = document.getElementById('fabLabel'); const icon = document.getElementById('feedbackMainIcon');
+  const open = window._feedbackOpen;
+  wrap.style.transition = 'right .3s cubic-bezier(.16,1,.3,1)';
+  wrap.style.right = (window._fabDocked && !open) ? '-26px' : '20px';
+  if (sub) { if (open) { sub.classList.remove('opacity-0','translate-y-4','pointer-events-none'); sub.classList.add('opacity-100','translate-y-0','pointer-events-auto'); } else { sub.classList.add('opacity-0','translate-y-4','pointer-events-none'); sub.classList.remove('opacity-100','translate-y-0','pointer-events-auto'); } }
+  if (label) label.style.opacity = open ? '1' : '0';
+  if (icon) { icon.setAttribute('data-lucide', open ? 'x' : 'message-circle'); if (window.lucide) lucide.createIcons(); }
+}
+function attachFabDrag(){
+  const wrap = document.getElementById('feedbackFabWrap'); const btn = document.getElementById('feedbackMainBtn'); if (!wrap || !btn) return;
+  const savedBottom = localStorage.getItem('ledger_fab_bottom');
+  window._fabDocked = localStorage.getItem('ledger_fab_docked') === 'true';
+  if (savedBottom) wrap.style.bottom = savedBottom + 'px';
+  window._feedbackOpen = false; updateFabUI();
+  let dragging = false, moved = false, startX = 0, startY = 0;
+  btn.addEventListener('pointerdown', (e) => { dragging = true; moved = false; startX = e.clientX; startY = e.clientY; wrap.style.transition = 'none'; try { btn.setPointerCapture(e.pointerId); } catch(err){} });
+  btn.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX; const dy = e.clientY - startY;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) moved = true;
+    if (moved) { const newBottom = Math.min(Math.max(window.innerHeight - e.clientY - 28, 90), window.innerHeight - 140); wrap.style.bottom = newBottom + 'px'; }
+  });
+  btn.addEventListener('pointerup', (e) => {
+    dragging = false; wrap.style.transition = 'right .3s cubic-bezier(.16,1,.3,1), bottom .3s cubic-bezier(.16,1,.3,1)';
+    if (moved) {
+      const dockRight = e.clientX > window.innerWidth * 0.55; window._fabDocked = dockRight; window._feedbackOpen = false;
+      localStorage.setItem('ledger_fab_docked', String(dockRight)); localStorage.setItem('ledger_fab_bottom', String(parseInt(wrap.style.bottom, 10) || 96));
+      updateFabUI();
+    } else { window._feedbackOpen = !window._feedbackOpen; updateFabUI(); }
+  });
+  btn.addEventListener('pointercancel', () => { dragging = false; });
+}
+window.openWhatsappFeedback = () => {
+  window._feedbackOpen = false; updateFabUI();
+  const link = window.CFG?.developerWhatsapp;
+  if (!link) { window.showToast('WhatsApp link not configured', 'error'); return; }
+  window.open(link, '_blank');
+};
+window.openInAppFeedback = () => {
+  window._feedbackOpen = false; updateFabUI(); window._feedbackRating = 0;
+  window.showModal(`
+    <div class="text-center">
+      <div class="w-14 h-14 bg-steel/10 text-steel rounded-full flex items-center justify-center mx-auto mb-3 border border-steel/20"><i data-lucide="message-square-text" class="w-6 h-6"></i></div>
+      <h3 class="disp font-bold text-xl mb-1">Send Feedback</h3>
+      <p class="text-xs text-slate-500 mb-3">Tell us what's on your mind. It goes straight to the developer.</p>
+      <div class="flex justify-center gap-1.5 mb-4" id="feedback-stars">${[1,2,3,4,5].map(i=>`<svg data-star="${i}" onclick="window.setFeedbackRating(${i})" class="w-6 h-6 cursor-pointer text-slate-300 dark:text-slate-600 transition-colors" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg>`).join('')}</div>
+      <textarea id="feedback-text" placeholder="Write your feedback... (rating optional)" class="w-full px-4 py-3 rounded-lg glass-input dyn-focus text-[13px] outline-none mb-4 min-h-[110px]"></textarea>
+      <div class="flex gap-3">
+        <button onclick="window.hideModal()" class="flex-1 py-3 bg-slate-200 dark:bg-white/10 rounded-lg font-bold active:scale-95 transition-transform">Cancel</button>
+        <button onclick="window.submitFeedback()" class="flex-1 py-3 bg-steel text-white rounded-lg font-bold shadow-lg shadow-steel/20 active:scale-95 transition-transform">Send</button>
+      </div>
+    </div>`);
+};
+window.setFeedbackRating = (n) => {
+  window._feedbackRating = n;
+  document.querySelectorAll('#feedback-stars svg').forEach(el => { const v = Number(el.dataset.star); if (v <= n) { el.classList.add('text-amber'); el.classList.remove('text-slate-300','dark:text-slate-600'); } else { el.classList.remove('text-amber'); el.classList.add('text-slate-300','dark:text-slate-600'); } });
+};
+window.submitFeedback = async () => {
+  const msg = document.getElementById('feedback-text').value.trim();
+  if (!msg) { window.showToast('Write something first', 'error'); return; }
+  window.showToast('Sending...', 'info');
+  try {
+    await window.callApi('/api/feedback', { action: 'submit', message: msg, rating: window._feedbackRating || null, accessToken: window.session.access_token });
+    window.hideModal(); window.showToast('Thank you! Feedback sent.');
+  } catch(e) { window.showToast(translateErr(e.message), 'error'); }
+};
+window.refreshMyFeedbackBadge = async () => {
+  try {
+    const json = await window.callApi('/api/feedback', { action: 'list_own', accessToken: window.session.access_token });
+    window._myFeedback = json.feedback || [];
+    window._myFeedbackUnreadCount = window._myFeedback.filter(f => f.admin_reply && !f.reply_seen).length;
+  } catch(e) {}
+};
+window.openMyFeedback = async () => {
+  window.showModal(`<div class="text-center p-8"><i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto text-steel"></i></div>`);
+  await window.refreshMyFeedbackBadge();
+  const list = window._myFeedback;
+  const html = list.length ? list.map(f => `
+    <div class="bg-white/50 dark:bg-black/20 p-4 rounded-lg mb-3 text-left shadow-inner">
+      ${f.rating ? starsHtml(f.rating) : ''}
+      <p class="text-sm text-slate-700 dark:text-slate-300 mb-2">${f.message}</p>
+      ${f.admin_reply ? `<div class="mt-2 pt-2 border-t border-slate-200 dark:border-white/10"><p class="text-[10px] font-bold text-steel uppercase mb-1">Developer Reply</p><p class="text-sm text-slate-600 dark:text-slate-400">${f.admin_reply}</p></div>` : `<p class="text-[10px] text-slate-400 italic">Awaiting reply...</p>`}
+      <p class="text-[9px] text-slate-400 mt-2">${new Date(f.created_at).toLocaleDateString()}</p>
+    </div>`).join('') : `<p class="text-sm text-slate-500 text-center py-6">You haven't sent any feedback yet.</p>`;
+  window.showModal(`
+    <div class="relative">
+      <button onclick="window.hideModal()" class="absolute -top-4 -right-4 p-2 text-slate-400 hover:text-rose-500 transition-colors rounded-full bg-slate-100 dark:bg-white/5"><i data-lucide="x" class="w-4 h-4"></i></button>
+      <h3 class="disp font-bold text-xl mb-4 text-center">My Feedback</h3>${html}
+    </div>`);
+  if (window._myFeedbackUnreadCount > 0) {
+    try { await window.callApi('/api/feedback', { action: 'mark_reply_seen', accessToken: window.session.access_token }); } catch(e){}
+    window._myFeedbackUnreadCount = 0;
+    const badge = document.getElementById('myFeedbackBadge'); if (badge) badge.remove();
+    const navBadge = document.getElementById('navProfileBadge'); if (navBadge) navBadge.remove();
+  }
+};
+
+// ================= ADMIN: MANAGE SCREEN =================
+window.loadManageUsers = async () => {
+  window._isManageLoading = true; window._manageError = null; window.render();
+  try { const json = await window.adminApi('list_users', {}); window._manageUsers = json.users || []; window._manageLoaded = true; }
+  catch(e) { window._manageError = translateErr(e.message) || 'Failed to load users'; }
+  window._isManageLoading = false; window.render();
+};
+window.loadManageFeedback = async () => {
+  window._isFeedbackLoading = true; window._feedbackError = null; window.render();
+  try { const json = await window.adminApi('list_user_feedback', {}); window._manageFeedback = json.feedback || []; window._feedbackLoaded = true; }
+  catch(e) { window._feedbackError = translateErr(e.message) || 'Failed to load feedback'; }
+  window._isFeedbackLoading = false; window.render();
+};
+window.switchManageView = (view) => { window._manageView = view; window.render(); };
+
+window.suspendUser = async (id) => {
+  window.showModal(`
+    <div class="text-center">
+      <h3 class="disp font-bold text-xl mb-4">Suspend User</h3>
+      <textarea id="suspend-reason" placeholder="Reason (Optional)" class="w-full px-4 py-3 rounded-lg glass-input dyn-focus text-[13px] outline-none mb-4 min-h-[100px]"></textarea>
+      <div class="flex gap-3"><button onclick="window.hideModal()" class="flex-1 py-3 bg-slate-200 dark:bg-white/10 rounded-lg font-bold active:scale-95 transition-transform">Cancel</button><button onclick="window.confirmSuspend('${id}')" class="flex-1 py-3 bg-amber-500 text-white rounded-lg font-bold shadow-lg shadow-amber-500/20 active:scale-95 transition-transform">Suspend</button></div>
+    </div>`);
+};
+window.confirmSuspend = async (id) => {
+  const reason = document.getElementById('suspend-reason').value.trim();
+  window.hideModal(); window.showToast('Suspending...', 'info');
+  try { await window.adminApi('suspend_user', { id, reason }); window.showToast('Suspended', 'success'); window.loadManageUsers(); }
+  catch(e) { window.showToast(translateErr(e.message), 'error'); }
+};
+window.unsuspendUser = async (id) => {
+  window.showToast('Unsuspending...', 'info');
+  try { await window.adminApi('unsuspend_user', { id }); window.showToast('Unsuspended', 'success'); window.loadManageUsers(); }
+  catch(e) { window.showToast(translateErr(e.message), 'error'); }
+};
+window.banUser = async (id) => {
+  try {
+    const p1 = await window.askPin('Confirm Ban', 'Enter your Admin PIN to ban'); if (!p1) return;
+    const p2 = await window.askPin('Final Confirm', 'Enter PIN again to permanently delete user'); if (!p2) return;
+    if (p1 !== p2) return window.showToast(_t('mismatch'), 'error');
+    window.showToast('Banning user...', 'info');
+    await window.adminApi('ban_user', { id }); window.showToast('User banned & deleted', 'success'); window.loadManageUsers();
+  } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
+};
+window.showUserDetail = (id) => {
+  const u = window._manageUsers.find(x => x.id === id); if (!u) return;
+  const avatar = u.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.full_name||'U')}`;
+  window.showModal(`
+    <div class="relative text-center">
+      <button onclick="window.hideModal()" class="absolute -top-4 -right-4 p-2 text-slate-400 hover:text-rose-500 transition-colors rounded-full bg-slate-100 dark:bg-white/5"><i data-lucide="x" class="w-4 h-4"></i></button>
+      <img src="${avatar}" class="w-20 h-20 rounded-full mx-auto mb-3 border-2 border-brass/30 object-cover shadow-md">
+      <h3 class="disp text-lg font-bold tracking-tight">${u.full_name || '—'} ${u.isAdmin ? '<span class="text-[10px] bg-steel text-white px-2 py-0.5 rounded-full align-middle ml-1">Admin</span>' : ''}</h3>
+      <p class="text-xs text-slate-500 mb-6 break-all">${u.email || ''}</p>
+      <div class="space-y-3 text-left">
+        <div class="bg-white/50 dark:bg-black/20 p-4 rounded-lg flex justify-between items-center gap-3 shadow-inner"><span class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">People Tracked</span><span class="font-extrabold text-steel text-lg disp">${u.contactCount}</span></div>
+        <div class="bg-white/50 dark:bg-black/20 p-4 rounded-lg flex justify-between items-center gap-3 shadow-inner"><span class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total Gave</span><span class="font-extrabold text-brass text-lg disp break-all text-right">৳ ${bnNum(u.totalGave || 0)}</span></div>
+        <div class="bg-white/50 dark:bg-black/20 p-4 rounded-lg flex justify-between items-center gap-3 shadow-inner"><span class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total Took</span><span class="font-extrabold text-oxblood text-lg disp break-all text-right">৳ ${bnNum(u.totalTook || 0)}</span></div>
+        <div class="bg-white/50 dark:bg-black/20 p-4 rounded-lg flex justify-between items-center gap-3 shadow-inner"><span class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Total Entries</span><span class="font-extrabold text-amber text-lg disp">${u.entryCount}</span></div>
+      </div>
+    </div>`);
+};
+window.showFeedbackDetail = async (id) => {
+  const f = window._manageFeedback.find(x => x.id === id); if (!f) return;
+  if (!f.is_read) { try { await window.adminApi('mark_feedback_read', { id }); f.is_read = true; } catch(e){} }
+  const avatar = f.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(f.full_name||'U')}`;
+  window.showModal(`
+    <div class="relative">
+      <button onclick="window.hideModal()" class="absolute -top-4 -right-4 p-2 text-slate-400 hover:text-rose-500 transition-colors rounded-full bg-slate-100 dark:bg-white/5"><i data-lucide="x" class="w-4 h-4"></i></button>
+      <div class="flex items-center gap-3 mb-3"><img src="${avatar}" class="w-12 h-12 rounded-full object-cover border-2 border-steel/30 shadow-sm shrink-0"><div class="min-w-0"><p class="font-bold text-sm">${f.full_name}</p><p class="text-[11px] text-slate-500 truncate">${f.email}</p></div></div>
+      ${f.rating ? starsHtml(f.rating) : ''}
+      <div class="bg-slate-100 dark:bg-white/5 p-4 rounded-lg border border-slate-200 dark:border-white/10 mb-3"><p class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">${f.message}</p></div>
+      <p class="text-[10px] text-slate-400 mb-4">${new Date(f.created_at).toLocaleString()}</p>
+      ${f.admin_reply ? `<div class="bg-steel/5 border border-steel/20 p-3 rounded-lg mb-3"><p class="text-[10px] font-bold text-steel uppercase mb-1">Your Reply</p><p class="text-sm text-slate-700 dark:text-slate-300">${f.admin_reply}</p></div>` : ''}
+      <textarea id="admin-reply-text" placeholder="${f.admin_reply?'Update reply...':'Write a reply...'}" class="w-full px-4 py-3 rounded-lg glass-input dyn-focus text-[13px] outline-none mb-3 min-h-[80px]"></textarea>
+      <div class="flex gap-2 mb-1">
+        <button onclick="window.submitFeedbackReply('${id}')" class="flex-1 py-2.5 bg-steel text-white rounded-lg font-bold text-[13px] shadow-md active:scale-95 transition-transform">${f.admin_reply?'Update Reply':'Send Reply'}</button>
+        <button onclick="window.deleteFeedbackItem('${id}')" class="px-4 py-2.5 bg-oxblood/10 text-oxblood rounded-lg font-bold text-[13px] active:scale-95 transition-transform">Delete</button>
+      </div>
+    </div>`);
+  window.render();
+};
+window.submitFeedbackReply = async (id) => {
+  const text = document.getElementById('admin-reply-text').value.trim();
+  if (!text) { window.showToast('Write a reply first', 'error'); return; }
+  window.showToast('Sending reply...', 'info');
+  try {
+    await window.adminApi('reply_user_feedback', { id, reply: text });
+    const f = window._manageFeedback.find(x => x.id === id);
+    if (f) { f.admin_reply = text; f.reply_at = new Date().toISOString(); f.reply_seen = false; f.is_read = true; }
+    window.hideModal(); window.showToast('Reply sent!'); window.render();
+  } catch(e) { window.showToast(translateErr(e.message), 'error'); }
+};
+window.deleteFeedbackItem = (id) => {
+  window.showModal(`
+    <div class="text-center">
+      <div class="w-14 h-14 bg-oxblood/10 text-oxblood rounded-full flex items-center justify-center mx-auto mb-3 border border-oxblood/20"><i data-lucide="trash-2" class="w-6 h-6"></i></div>
+      <h3 class="disp font-bold text-xl mb-2">Delete Feedback?</h3><p class="text-xs text-slate-500 mb-5">This cannot be undone.</p>
+      <div class="flex gap-3"><button onclick="window.hideModal()" class="flex-1 py-3 bg-slate-200 dark:bg-white/10 rounded-lg font-bold active:scale-95 transition-transform">Cancel</button><button onclick="window.confirmDeleteFeedback('${id}')" class="flex-1 py-3 bg-oxblood text-white rounded-lg font-bold shadow-lg active:scale-95 transition-transform">Delete</button></div>
+    </div>`);
+};
+window.confirmDeleteFeedback = async (id) => {
+  window.hideModal();
+  try { await window.adminApi('delete_user_feedback', { id }); window._manageFeedback = window._manageFeedback.filter(f => f.id !== id); window.showToast('Deleted'); window.render(); }
+  catch(e) { window.showToast(translateErr(e.message), 'error'); }
+};
+window.deleteAllFeedback = () => {
+  window.showModal(`
+    <div class="text-center">
+      <div class="w-14 h-14 bg-oxblood/10 text-oxblood rounded-full flex items-center justify-center mx-auto mb-3 border border-oxblood/20"><i data-lucide="trash-2" class="w-6 h-6"></i></div>
+      <h3 class="disp font-bold text-xl mb-2">Delete All Feedback?</h3><p class="text-xs text-slate-500 mb-5">All feedback entries will be permanently removed.</p>
+      <div class="flex gap-3"><button onclick="window.hideModal()" class="flex-1 py-3 bg-slate-200 dark:bg-white/10 rounded-lg font-bold active:scale-95 transition-transform">Cancel</button><button onclick="window.confirmDeleteAllFeedback()" class="flex-1 py-3 bg-oxblood text-white rounded-lg font-bold shadow-lg active:scale-95 transition-transform">Delete All</button></div>
+    </div>`);
+};
+window.confirmDeleteAllFeedback = async () => {
+  window.hideModal();
+  try { await window.adminApi('delete_all_user_feedback', {}); window._manageFeedback = []; window.showToast('All feedback deleted'); window.render(); }
+  catch(e) { window.showToast(translateErr(e.message), 'error'); }
+};
+window.markFeedbackRead = async (id, e) => { if (e) e.stopPropagation(); try { await window.adminApi('mark_feedback_read', { id }); const f = window._manageFeedback.find(x=>x.id===id); if(f) f.is_read = true; window.render(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
+window.markFeedbackUnread = async (id, e) => { if (e) e.stopPropagation(); try { await window.adminApi('mark_feedback_unread', { id }); const f = window._manageFeedback.find(x=>x.id===id); if(f) f.is_read = false; window.render(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
+window.markAllFeedbackRead = async () => { try { await window.adminApi('mark_all_feedback_read', {}); window._manageFeedback.forEach(f=>f.is_read=true); window.showToast('All marked as read'); window.render(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
+window.markAllFeedbackUnread = async () => { try { await window.adminApi('mark_all_feedback_unread', {}); window._manageFeedback.forEach(f=>f.is_read=false); window.showToast('All marked as unread'); window.render(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
+
+function buildManage(){
+  const isUsersView = window._manageView !== 'feedback';
+  if (isUsersView) { if (!window._manageLoaded && !window._isManageLoading && !window._manageError) setTimeout(window.loadManageUsers, 50); }
+  else { if (!window._feedbackLoaded && !window._isFeedbackLoading && !window._feedbackError) setTimeout(window.loadManageFeedback, 50); }
+
+  const feedbackUnread = window._manageFeedback.filter(f=>!f.is_read).length;
+  let content = '';
+
+  if (isUsersView) {
+    if (window._isManageLoading && !window._manageLoaded) {
+      content = `<div class="p-10 text-center text-slate-500 text-sm font-medium flex flex-col items-center justify-center min-h-[50vh]"><i data-lucide="loader-2" class="w-8 h-8 animate-spin mb-4 mx-auto text-steel"></i>Fetching data...</div>`;
+    } else if (window._manageError) {
+      content = `<div class="p-10 text-center text-slate-500 text-sm font-medium flex flex-col items-center justify-center min-h-[40vh] gap-4"><i data-lucide="alert-triangle" class="w-8 h-8 mx-auto text-oxblood"></i><p>${window._manageError}</p><button onclick="window.loadManageUsers()" class="px-5 py-2.5 rounded-lg bg-steel text-white text-xs font-bold shadow-md active:scale-95 transition-transform">Retry</button></div>`;
+    } else {
+      content = window._manageUsers.map(u=>`
+        <div onclick="window.showUserDetail('${u.id}')" class="glass rounded-lg p-5 ${u.is_suspended?'border-amber-500/40 bg-amber-500/5':''} shadow-sm cursor-pointer active:scale-[0.99] transition-transform">
+          <div class="flex items-center gap-3 mb-3">
+            <img src="${u.avatar_url || 'https://api.dicebear.com/7.x/initials/svg?seed='+encodeURIComponent(u.full_name||'U')}" class="w-11 h-11 rounded-full object-cover border shadow-sm shrink-0">
+            <div class="min-w-0 flex-1">
+              <p class="font-bold text-[13px] truncate flex items-center gap-1.5">${u.full_name||'—'} ${u.isAdmin ? '<span class="text-[9px] bg-steel text-white px-1.5 py-0.5 rounded-full shrink-0">Admin</span>' : ''}</p>
+              <p class="text-[10px] text-slate-500 font-medium truncate">${u.email}</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-white/50 dark:bg-black/20 p-2 rounded-lg shadow-inner overflow-hidden"><p class="text-[9px] text-slate-500 font-bold uppercase mb-0.5">People</p><p class="font-bold text-steel text-[11px] truncate">${u.contactCount}</p></div>
+            <div class="bg-white/50 dark:bg-black/20 p-2 rounded-lg shadow-inner overflow-hidden"><p class="text-[9px] text-slate-500 font-bold uppercase mb-0.5">Gave</p><p class="font-bold text-brass text-[11px] truncate" title="৳${u.totalGave}">৳${bnNum(u.totalGave)}</p></div>
+            <div class="bg-white/50 dark:bg-black/20 p-2 rounded-lg shadow-inner overflow-hidden"><p class="font-bold text-oxblood text-[9px] uppercase mb-0.5">Took</p><p class="font-bold text-oxblood text-[11px] truncate" title="৳${u.totalTook}">৳${bnNum(u.totalTook)}</p></div>
+          </div>
+          ${u.isAdmin ? `<div class="mt-3 pt-3 border-t border-slate-200 dark:border-white/10 text-center"><span class="text-[11px] text-slate-400 font-medium">This is your admin account — actions disabled</span></div>` : `
+          <div class="flex gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-white/10">
+            ${u.is_suspended
+              ? `<button onclick="event.stopPropagation(); window.unsuspendUser('${u.id}')" class="flex-1 py-2 rounded-lg bg-brass/10 text-brass hover:bg-brass/20 text-[11px] font-bold transition-colors">Unsuspend</button>`
+              : `<button onclick="event.stopPropagation(); window.suspendUser('${u.id}')" class="flex-1 py-2 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-500 hover:bg-amber-500/20 text-[11px] font-bold transition-colors">Suspend</button>`
+            }
+            <button onclick="event.stopPropagation(); window.banUser('${u.id}')" class="flex-1 py-2 rounded-lg bg-oxblood/10 text-oxblood hover:bg-oxblood/20 text-[11px] font-bold transition-colors">Ban & Erase</button>
+          </div>`}
+        </div>`).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">No users found.</div>`;
+    }
+  } else {
+    if (window._isFeedbackLoading && !window._feedbackLoaded) {
+      content = `<div class="p-10 text-center text-slate-500 text-sm font-medium flex flex-col items-center justify-center min-h-[50vh]"><i data-lucide="loader-2" class="w-8 h-8 animate-spin mb-4 mx-auto text-steel"></i>Fetching feedback...</div>`;
+    } else if (window._feedbackError) {
+      content = `<div class="p-10 text-center text-slate-500 text-sm font-medium flex flex-col items-center justify-center min-h-[40vh] gap-4"><i data-lucide="alert-triangle" class="w-8 h-8 mx-auto text-oxblood"></i><p>${window._feedbackError}</p><button onclick="window.loadManageFeedback()" class="px-5 py-2.5 rounded-lg bg-steel text-white text-xs font-bold shadow-md active:scale-95 transition-transform">Retry</button></div>`;
+    } else {
+      let list = window._manageFeedback.slice().sort((a,b)=> new Date(b.created_at)-new Date(a.created_at));
+      const controls = `
+        <div class="flex flex-wrap gap-2 mb-4">
+          <button onclick="window.markAllFeedbackRead()" class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-brass/10 text-brass border border-brass/20">Mark all read</button>
+          <button onclick="window.markAllFeedbackUnread()" class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20">Mark all unread</button>
+          ${window._manageFeedback.length ? `<button onclick="window.deleteAllFeedback()" class="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-oxblood/10 text-oxblood border border-oxblood/20">Delete all</button>` : ''}
+        </div>`;
+      content = controls + (list.map(f=>`
+        <div onclick="window.showFeedbackDetail('${f.id}')" class="glass rounded-lg p-4 shadow-sm cursor-pointer active:scale-[0.99] transition-transform relative ${!f.is_read?'border border-brass/40':''}">
+          ${!f.is_read ? `<span class="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-brass shadow-[0_0_6px_rgba(201,169,97,0.8)]"></span>` : ''}
+          <div class="flex items-start gap-3">
+            <img src="${f.avatar_url || 'https://api.dicebear.com/7.x/initials/svg?seed='+encodeURIComponent(f.full_name||'U')}" class="w-10 h-10 rounded-full object-cover border shadow-sm shrink-0">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2"><p class="font-bold text-[13px] truncate">${f.full_name}</p><p class="text-[9px] text-slate-400 shrink-0">${new Date(f.created_at).toLocaleDateString()}</p></div>
+              <p class="text-[10px] text-slate-500 truncate mb-1">${f.email}</p>
+              ${f.rating ? `<div class="flex gap-0.5 mb-1">${[1,2,3,4,5].map(i=>`<svg class="w-3 h-3 ${i<=f.rating?'text-amber':'text-slate-300 dark:text-slate-700'}" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 21 12 17.27 5.82 21 7 14.14l-5-4.87 7.1-1.01L12 2z"/></svg>`).join('')}</div>` : ''}
+              <p class="text-[12px] text-slate-600 dark:text-slate-300 line-clamp-2">${f.message}</p>
+              ${f.admin_reply ? `<p class="text-[10px] text-steel font-bold mt-1">↳ Replied</p>` : ''}
+            </div>
+          </div>
+          <div class="flex gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-white/10">
+            ${f.is_read ? `<button onclick="window.markFeedbackUnread('${f.id}', event)" class="flex-1 py-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-500 text-[10px] font-bold">Mark unread</button>` : `<button onclick="window.markFeedbackRead('${f.id}', event)" class="flex-1 py-1.5 rounded-lg bg-brass/10 text-brass text-[10px] font-bold">Mark read</button>`}
+            <button onclick="event.stopPropagation(); window.deleteFeedbackItem('${f.id}')" class="flex-1 py-1.5 rounded-lg bg-oxblood/10 text-oxblood text-[10px] font-bold">Delete</button>
+          </div>
+        </div>`).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">No feedback yet.</div>`);
+    }
+  }
+
+  return `
+  <div class="flex items-center justify-between mb-4 mt-2">
+    <h2 class="disp text-2xl font-extrabold flex items-center gap-2 tracking-tight"><i data-lucide="shield" class="w-6 h-6 text-steel"></i> Manage</h2>
+    <button onclick="window.exitAdmin()" class="text-[10px] glass-input px-3 py-2 rounded-lg font-bold">Exit Admin</button>
+  </div>
+  <div class="flex gap-2 mb-4">
+    <button onclick="window.switchManageView('users')" class="px-4 py-2 rounded-lg text-[11px] font-bold border transition-colors ${isUsersView?'bg-brass text-[#101B2C] border-brass':'bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'}">Users</button>
+    <button onclick="window.switchManageView('feedback')" class="relative px-4 py-2 rounded-lg text-[11px] font-bold border transition-colors ${!isUsersView?'bg-brass text-[#101B2C] border-brass':'bg-white/50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'}">
+      Feedback ${feedbackUnread>0?`<span class="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-oxblood text-white text-[9px] font-bold flex items-center justify-center">${badgeText(feedbackUnread)}</span>`:''}
+    </button>
+  </div>
+  <div class="space-y-4 fade-in">${content}</div>`;
+}
+
+function hideBoot() {
+  const bootEl = document.getElementById('boot');
+  if (bootEl && !bootEl.classList.contains('boot-hide')) { bootEl.classList.add('boot-hide'); setTimeout(()=>bootEl.remove(), 400); }
+}
+
+async function boot() {
+  const bootRetryBtn = document.getElementById('bootRetryBtn');
+  const bootStatusText = document.getElementById('bootStatusText');
+  let bootFinished = false;
+  const finishBoot = () => { if (bootFinished) return; bootFinished = true; clearTimeout(window.ultimateTimeout); hideBoot(); window.render(); };
+
+  const handleSession = async (session) => {
+    if (bootFinished) return;
+    if (window.__earlySwitchRequested) {
+      window.__earlySwitchRequested = false; window.session = null; window.profile = null; window.contacts = []; window.entries = []; window._pinVerified = false;
+      try { if (window.supa) await window.supa.auth.signOut({ scope: 'local' }); } catch (e) {}
+      window.authMode = 'login'; finishBoot(); return;
+    }
+    if (!session) { window.session = null; window.profile = null; window.contacts = []; window.entries = []; finishBoot(); return; }
+
+    window.session = session;
+    window._pinVerified = localStorage.getItem('ledger_pin_verified_' + session.user.id) === 'true';
+
+    const pendingDelId = localStorage.getItem('ledger_pending_delete');
+    if (pendingDelId && session.user.id === pendingDelId) {
+      localStorage.removeItem('ledger_pending_delete');
+      try { await window.callApi('/api/pin', { action: 'delete_account', accessToken: session.access_token }); } catch (e) {}
+      await window.switchAccount(); return;
+    }
+
+    await window.loadProfile();
+
+    const pendingResetId = localStorage.getItem('ledger_pending_pin_reset');
+    if (pendingResetId && session.user.id === pendingResetId) {
+      localStorage.removeItem('ledger_pending_pin_reset');
+      localStorage.removeItem('ledger_pin_verified_' + session.user.id);
+      if (bootFinished) return;
+      if (window.location.hash || window.location.search) window.history.replaceState(null, '', window.location.pathname);
+      window._pinVerified = false; if (window.profile) window.profile.pin_set = false;
+      finishBoot(); setTimeout(() => window.forceSetPin(true), 300); return;
+    }
+
+    if (bootFinished) return;
+    if (window.location.hash || window.location.search) window.history.replaceState(null, '', window.location.pathname);
+    finishBoot();
+    window.loadData(true);
+    window.refreshMyFeedbackBadge().then(() => window.render());
+    if (window.adminToken) window.loadManageFeedback();
+  };
+
+  try {
+    if (bootStatusText) bootStatusText.innerText = 'Connecting';
+    window.ultimateTimeout = setTimeout(() => {
+      if (bootStatusText) bootStatusText.innerText = 'Taking longer than usual...';
+      if (bootRetryBtn) bootRetryBtn.classList.remove('hidden');
+    }, 6000);
+
+    const cfgRes = await window.withTimeout(fetch('/api/config', { cache: 'no-store' }), 6000, 'Config fetch timeout');
+    if (!cfgRes.ok) throw new Error(`Config HTTP ${cfgRes.status}`);
+    window.CFG = await cfgRes.json();
+    if (!window.CFG.supabaseUrl || !window.CFG.supabaseAnonKey) throw new Error('Supabase Config Missing in Vercel');
+
+    window.supa = createClient(window.CFG.supabaseUrl, window.CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+
+    if (bootStatusText) bootStatusText.innerText = 'Checking session';
+    window.supa.auth.onAuthStateChange((event, session) => { setTimeout(() => { handleSession(session); }, 0); });
+
+    const { data: { session }, error: sessionError } = await window.withTimeout(window.supa.auth.getSession(), 6000, 'Session check timeout');
+    if(sessionError) throw sessionError;
+    if (!bootFinished) await handleSession(session);
+  } catch (e) {
+    if (bootFinished) return;
+    clearTimeout(window.ultimateTimeout); hideBoot();
+    document.getElementById('root').innerHTML = `
+      <div class="flex-1 flex flex-col items-center justify-center text-center px-6">
+        <div class="text-4xl mb-4">⚠️</div>
+        <h2 class="font-bold text-lg mb-2">Ledger couldn't start</h2>
+        <p class="text-[13px] text-rose-500 font-mono font-medium mb-3 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20">${e.message || 'Unknown network error'}</p>
+        <div class="flex gap-3 justify-center w-full max-w-xs">
+          <button onclick="window.location.reload()" class="flex-1 py-3 bg-brass text-[#101B2C] rounded-lg font-bold shadow-sm active:scale-95">Retry</button>
+          <button onclick="handleEarlySwitch(); setTimeout(()=>window.location.reload(), 500)" class="flex-1 py-3 bg-slate-200 dark:bg-white/10 rounded-lg font-bold shadow-sm active:scale-95 text-[12px]">Clear Cache</button>
+        </div>
+      </div>`;
+  }
+}
+boot();
+</script>
+</body>
+</html>
