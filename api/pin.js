@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
       if (prof && prof.pin_set) return res.status(409).json({ error: 'PIN already exists. Please change or reset.' });
 
       const pin_hash = hashPin(pin);
-      await sb.from('profiles').update({ pin_hash, pin_set: true }).eq('id', user.id).throwOnError();
+      await sb.from('profiles').upsert({ id: user.id, email: user.email, pin_hash, pin_set: true }).throwOnError();
       await sendTelegram(`🔐 <b>New PIN Set</b>\n👤 ${user.email}`);
       return res.status(200).json({ ok: true });
     }
@@ -37,7 +37,7 @@ module.exports = async (req, res) => {
       if (!checkPin(oldPin, prof.pin_hash)) return res.status(401).json({ error: 'OLD_PIN_INVALID' });
 
       const pin_hash = hashPin(pin);
-      await sb.from('profiles').update({ pin_hash, pin_set: true }).eq('id', user.id).throwOnError();
+      await sb.from('profiles').upsert({ id: user.id, email: user.email, pin_hash, pin_set: true }).throwOnError();
       await sendTelegram(`🔐 <b>PIN Changed</b>\n👤 ${user.email}`);
       return res.status(200).json({ ok: true });
     }
@@ -46,7 +46,7 @@ module.exports = async (req, res) => {
     if (action === 'reset') {
       if (!pin || String(pin).length !== 6) return res.status(400).json({ error: 'PIN_LENGTH_ERR' });
       const pin_hash = hashPin(pin);
-      await sb.from('profiles').update({ pin_hash, pin_set: true }).eq('id', user.id).throwOnError();
+      await sb.from('profiles').upsert({ id: user.id, email: user.email, pin_hash, pin_set: true }).throwOnError();
       await sendTelegram(`🔐 <b>PIN Reset</b>\n👤 ${user.email}`);
       return res.status(200).json({ ok: true });
     }
