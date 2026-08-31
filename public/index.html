@@ -78,21 +78,23 @@ tailwind.config = {
   .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .ring-track{stroke:rgba(80,60,160,.14)} .dark .ring-track{stroke:rgba(255,255,255,.1)}
   .ring-prog{stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.16,1,.3,1), stroke .4s ease;}
-  
+
   .pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
   .calc-btn {
-      padding: 16px 0;
-      font-size: 22px;
-      font-weight: 700;
-      border-radius: 16px;
+      padding: 0;
+      height: 100%;
+      min-height: 40px;
+      border-radius: 12px;
       transition: all 0.1s;
       font-family: 'Space Grotesk', monospace;
       display: flex;
       align-items: center;
       justify-content: center;
+      font-weight: 700;
   }
   .calc-btn:active { transform: scale(0.92); filter: brightness(0.9); }
   .dark .calc-btn:active { filter: brightness(1.2); }
+  
 </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100 flex flex-col h-full w-full relative">
@@ -896,14 +898,88 @@ window.openContact = (id) => { window._openContactId = id; window._entryType = '
 window.closeContact = () => { window._openContactId = null; window.renderContent(); };
 
 // Calculator Logic for Input Amount
+// ================= FLOATING CALCULATOR LOGIC =================
+window.calcDrag = { active: false, startX: 0, startY: 0, initialLeft: 0, initialTop: 0 };
+window.calcResize = { active: false, startX: 0, startY: 0, initialW: 0, initialH: 0 };
+
+window.startCalcDrag = (e) => {
+    if(e.target.closest('button')) return; // Ignore if clicked on header buttons
+    window.calcDrag.active = true;
+    window.calcDrag.startX = e.clientX; window.calcDrag.startY = e.clientY;
+    const calc = document.getElementById('calc-keyboard');
+    const rect = calc.getBoundingClientRect();
+    window.calcDrag.initialLeft = rect.left; window.calcDrag.initialTop = rect.top;
+    calc.style.transform = 'none'; // Lock position to raw pixels
+    calc.style.left = rect.left + 'px'; calc.style.top = rect.top + 'px';
+    calc.style.bottom = 'auto'; calc.style.right = 'auto';
+    document.getElementById('calc-header').setPointerCapture(e.pointerId);
+};
+
+window.startCalcResize = (e) => {
+    window.calcResize.active = true;
+    window.calcResize.startX = e.clientX; window.calcResize.startY = e.clientY;
+    const calc = document.getElementById('calc-keyboard');
+    window.calcResize.initialW = calc.offsetWidth; window.calcResize.initialH = calc.offsetHeight;
+    const rect = calc.getBoundingClientRect();
+    calc.style.transform = 'none';
+    calc.style.left = rect.left + 'px'; calc.style.top = rect.top + 'px';
+    calc.style.bottom = 'auto'; calc.style.right = 'auto';
+    document.getElementById('calc-resizer').setPointerCapture(e.pointerId);
+};
+
+// Unified listeners for drag and resize to survive DOM rewrites
+document.addEventListener('pointermove', (e) => {
+    if (window.calcDrag.active) {
+        const calc = document.getElementById('calc-keyboard');
+        const dx = e.clientX - window.calcDrag.startX;
+        const dy = e.clientY - window.calcDrag.startY;
+        calc.style.left = (window.calcDrag.initialLeft + dx) + 'px';
+        calc.style.top = (window.calcDrag.initialTop + dy) + 'px';
+    }
+    if (window.calcResize.active) {
+        const calc = document.getElementById('calc-keyboard');
+        const dx = e.clientX - window.calcResize.startX;
+        const dy = e.clientY - window.calcResize.startY;
+        calc.style.width = Math.max(220, window.calcResize.initialW + dx) + 'px'; // min width limits
+        calc.style.height = Math.max(300, window.calcResize.initialH + dy) + 'px'; // min height limits
+    }
+});
+document.addEventListener('pointerup', () => { window.calcDrag.active = false; window.calcResize.active = false; });
+document.addEventListener('pointercancel', () => { window.calcDrag.active = false; window.calcResize.active = false; });
+
 window.openCalc = () => {
     const calc = document.getElementById('calc-keyboard');
-    if(calc) calc.classList.remove('translate-y-full');
+    if(calc) {
+        calc.classList.remove('hidden');
+        requestAnimationFrame(() => {
+            calc.classList.remove('opacity-0', 'scale-95');
+            calc.classList.add('opacity-100', 'scale-100');
+        });
+    }
 };
+
 window.closeCalc = () => {
     const calc = document.getElementById('calc-keyboard');
-    if(calc) calc.classList.add('translate-y-full');
+    if(calc) {
+        calc.classList.remove('opacity-100', 'scale-100');
+        calc.classList.add('opacity-0', 'scale-95');
+        setTimeout(() => calc.classList.add('hidden'), 200);
+    }
 };
+
+window.resetCalc = () => {
+    const calc = document.getElementById('calc-keyboard');
+    if(calc) {
+        calc.style.width = '280px';
+        calc.style.height = '380px'; // Compact default height
+        calc.style.left = '50%';
+        calc.style.top = '50%';
+        calc.style.bottom = 'auto';
+        calc.style.right = 'auto';
+        calc.style.transform = 'translate(-50%, -50%)';
+    }
+};
+
 window.calcPress = (key) => {
     const input = document.getElementById('entryAmount');
     if (!input) return;
@@ -1000,38 +1076,51 @@ function buildContactDetail(id) {
     </div>
   </div>
   
-  <div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-100 dark:bg-[#1B1638] border-t border-slate-200 dark:border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] z-[200] transform translate-y-full transition-transform duration-300 pb-safe pb-4">
-      <div class="flex justify-between items-center px-4 py-2 bg-slate-200 dark:bg-white/5 border-b border-slate-300 dark:border-white/5">
-          <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Calculator</span>
-          <button type="button" onclick="window.closeCalc()" class="p-2 text-slate-500 hover:text-oxblood font-bold transition-colors"><i data-lucide="chevron-down" class="w-5 h-5"></i></button>
+  <div id="calc-keyboard" class="fixed z-[200] hidden flex-col glass dark:bg-[#1B1638]/70 backdrop-blur-2xl rounded-3xl border border-white/40 dark:border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.4)] transition-all duration-200 opacity-0 scale-95" style="width: 280px; height: 380px; left: 50%; top: 50%; transform: translate(-50%, -50%); transform-origin: center;">
+      <!-- Header / Drag Handle -->
+      <div id="calc-header" onpointerdown="window.startCalcDrag(event)" class="flex justify-between items-center px-4 py-2 bg-white/30 dark:bg-white/5 border-b border-slate-300 dark:border-white/5 cursor-move touch-none rounded-t-3xl shrink-0">
+          <span class="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><i data-lucide="calculator" class="w-3.5 h-3.5"></i> Calc</span>
+          <div class="flex items-center gap-1.5">
+              <button type="button" onclick="window.resetCalc()" class="p-1.5 text-slate-500 hover:text-brass font-bold transition-colors bg-white/50 dark:bg-white/10 rounded-xl shadow-sm" title="Reset Size/Position"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i></button>
+              <button type="button" onclick="window.closeCalc()" class="p-1.5 text-slate-500 hover:text-oxblood font-bold transition-colors bg-white/50 dark:bg-white/10 rounded-xl shadow-sm"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+          </div>
       </div>
-      <div class="grid grid-cols-4 gap-2 p-3">
-          <button type="button" onclick="window.calcPress('AC')" class="calc-btn text-oxblood bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">AC</button>
-          <button type="button" onclick="window.calcPress('%')" class="calc-btn text-steel bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">%</button>
-          <button type="button" onclick="window.calcPress('÷')" class="calc-btn text-steel bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">÷</button>
-          <button type="button" onclick="window.calcPress('×')" class="calc-btn text-steel bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">×</button>
+      
+      <!-- Keys -->
+      <div class="grid grid-cols-4 gap-1.5 p-2 flex-1 overflow-hidden h-full">
+          <button type="button" onclick="window.calcPress('AC')" class="calc-btn text-oxblood bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-sm">AC</button>
+          <button type="button" onclick="window.calcPress('%')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-lg">%</button>
+          <button type="button" onclick="window.calcPress('÷')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-lg">÷</button>
+          <button type="button" onclick="window.calcPress('×')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-lg">×</button>
 
-          <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">7</button>
-          <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">8</button>
-          <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">9</button>
-          <button type="button" onclick="window.calcPress('−')" class="calc-btn text-brass text-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">−</button>
+          <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">7</button>
+          <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">8</button>
+          <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">9</button>
+          <button type="button" onclick="window.calcPress('−')" class="calc-btn text-brass text-xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">−</button>
 
-          <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">4</button>
-          <button type="button" onclick="window.calcPress('5')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">5</button>
-          <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">6</button>
-          <button type="button" onclick="window.calcPress('+')" class="calc-btn text-brass text-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">+</button>
+          <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">4</button>
+          <button type="button" onclick="window.calcPress('5')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">5</button>
+          <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">6</button>
+          <button type="button" onclick="window.calcPress('+')" class="calc-btn text-brass text-xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">+</button>
 
-          <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">1</button>
-          <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">2</button>
-          <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">3</button>
-          <button type="button" onclick="window.calcPress('=')" class="calc-btn bg-brass text-[#120E29] row-span-2 text-3xl shadow-md">=</button>
+          <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">1</button>
+          <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">2</button>
+          <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">3</button>
+          <button type="button" onclick="window.calcPress('=')" class="calc-btn bg-brass text-[#120E29] row-span-2 text-2xl shadow-md font-extrabold">=</button>
 
-          <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white dark:bg-white/5 shadow-sm"><i data-lucide="delete" class="w-6 h-6 mx-auto"></i></button>
-          <button type="button" onclick="window.calcPress('0')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">0</button>
-          <button type="button" onclick="window.calcPress('.')" class="calc-btn text-slate-800 dark:text-white text-2xl bg-white dark:bg-white/5 shadow-sm">.</button>
+          <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white/80 dark:bg-white/10 shadow-sm"><i data-lucide="delete" class="w-5 h-5 mx-auto"></i></button>
+          <button type="button" onclick="window.calcPress('0')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">0</button>
+          <button type="button" onclick="window.calcPress('.')" class="calc-btn text-slate-800 dark:text-white text-xl bg-white/80 dark:bg-white/10 shadow-sm">.</button>
       </div>
-      <div class="px-3 pt-2">
-         <button type="button" onclick="window.closeCalc(); window.submitEntry('${c.id}')" class="w-full py-3.5 rounded-2xl bg-brass text-[#120E29] font-bold shadow-lg flex items-center justify-center gap-2 text-[15px] active:scale-[0.98] transition-transform"><i data-lucide="check-circle" class="w-5 h-5"></i> এন্ট্রি করুন (Save)</button>
+      
+      <!-- Insert Action Button -->
+      <div class="px-2 pb-2 pt-1 shrink-0 relative">
+          <button type="button" onclick="window.closeCalc();" class="w-full py-2.5 rounded-xl bg-slate-800 dark:bg-white text-white dark:text-[#120E29] font-bold shadow-[0_4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center gap-2 text-[13px] active:scale-[0.98] transition-transform">✅ এন্ট্রি বক্সে বসান (Insert)</button>
+      </div>
+
+      <!-- Resize Handle (Bottom Right Corner) -->
+      <div id="calc-resizer" onpointerdown="window.startCalcResize(event)" class="absolute bottom-0 right-0 w-8 h-8 cursor-nwse-resize touch-none flex items-end justify-end p-2 opacity-50 hover:opacity-100 z-50">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-slate-500 dark:text-slate-400"><path d="M22 22H12l10-10v10zm0-14L8 22H2l20-20v6z"/></svg>
       </div>
   </div>`;
 }
