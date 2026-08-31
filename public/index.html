@@ -661,6 +661,17 @@ function updateNav() {
   document.querySelectorAll('.themeSlider').forEach(el => el.classList.toggle('translate-x-[26px]', htmlDark));
 }
 window.changeTab = (tab) => { if (tab === 'manage' && !window.adminToken) return; window._openContactId = null; window.activeTab = tab; localStorage.setItem('ledger_tab', tab); window.renderContent(); };
+  
+window.openContact = (id) => {
+  window._openContactId = id;
+  window.renderContent();
+};
+
+window.closeContact = () => {
+  window._openContactId = null;
+  window.renderContent();
+};
+
 window.toggleTheme = () => { const html = document.documentElement; html.classList.toggle('dark'); localStorage.setItem('ledger_theme', html.classList.contains('dark') ? 'dark' : 'light'); updateNav(); };
 
 function buildTabContent() {
