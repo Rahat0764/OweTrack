@@ -140,6 +140,36 @@ tailwind.config = {
   </div>
 </div>
 
+<!-- Horizontal Full-width Bottom Keyboard -->
+<div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 w-full z-[9999] flex flex-col glass dark:bg-[#1B1638]/95 backdrop-blur-3xl rounded-t-3xl border-t border-slate-200 dark:border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.4)] transition-transform duration-300 translate-y-full pb-safe" style="visibility: hidden;">
+    <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-1 cursor-pointer hover:bg-slate-400 transition-colors" onclick="window.closeCalc()"></div>
+    <div class="grid grid-cols-4 gap-1.5 p-3 pt-1">
+        <button type="button" onclick="window.calcPress('AC')" class="calc-btn text-oxblood bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-sm">AC</button>
+        <button type="button" onclick="window.calcPress('%')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-xl">%</button>
+        <button type="button" onclick="window.calcPress('÷')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">÷</button>
+        <button type="button" onclick="window.calcPress('×')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">×</button>
+
+        <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">7</button>
+        <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">8</button>
+        <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">9</button>
+        <button type="button" onclick="window.calcPress('−')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">−</button>
+
+        <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">4</button>
+        <button type="button" onclick="window.calcPress('5')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">5</button>
+        <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">6</button>
+        <button type="button" onclick="window.calcPress('+')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">+</button>
+
+        <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">1</button>
+        <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">2</button>
+        <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">3</button>
+        <button type="button" onclick="window.calcPress('=')" class="calc-btn bg-brass text-[#120E29] row-span-2 text-3xl shadow-md font-extrabold">=</button>
+
+        <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white/80 dark:bg-white/10 shadow-sm"><i data-lucide="delete" class="w-6 h-6 mx-auto"></i></button>
+        <button type="button" onclick="window.calcPress('0')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">0</button>
+        <button type="button" onclick="window.calcPress('.')" class="calc-btn text-slate-800 dark:text-white text-3xl bg-white/80 dark:bg-white/10 shadow-sm">.</button>
+    </div>
+</div>`;
+  
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
 
@@ -769,7 +799,6 @@ window.calcPress = (key) => {
             let res = eval(expr);
             if (res === Infinity || isNaN(res)) throw new Error('invalid');
             val = Number(Number(res).toFixed(2)).toString();
-            window.closeCalc();
         } catch(e) { /* ignore */ }
     }
     else {
@@ -868,37 +897,7 @@ function buildContactDetail(id) {
         </div>
       </div>`).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">${_t('no_entries')}</div>`}
     </div>
-  </div>
-  
-  <!-- Horizontal Full-width Bottom Keyboard -->
-  <div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 w-full z-[9999] flex flex-col glass dark:bg-[#1B1638]/95 backdrop-blur-3xl rounded-t-3xl border-t border-slate-200 dark:border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.4)] transition-transform duration-300 translate-y-full pb-safe" style="visibility: hidden;">
-      <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-1 cursor-pointer hover:bg-slate-400 transition-colors" onclick="window.closeCalc()"></div>
-      <div class="grid grid-cols-4 gap-1.5 p-3 pt-1">
-          <button type="button" onclick="window.calcPress('AC')" class="calc-btn text-oxblood bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-sm">AC</button>
-          <button type="button" onclick="window.calcPress('%')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-xl">%</button>
-          <button type="button" onclick="window.calcPress('÷')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">÷</button>
-          <button type="button" onclick="window.calcPress('×')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">×</button>
-
-          <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">7</button>
-          <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">8</button>
-          <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">9</button>
-          <button type="button" onclick="window.calcPress('−')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">−</button>
-
-          <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">4</button>
-          <button type="button" onclick="window.calcPress('5')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">5</button>
-          <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">6</button>
-          <button type="button" onclick="window.calcPress('+')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">+</button>
-
-          <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">1</button>
-          <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">2</button>
-          <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">3</button>
-          <button type="button" onclick="window.calcPress('=')" class="calc-btn bg-brass text-[#120E29] row-span-2 text-3xl shadow-md font-extrabold">=</button>
-
-          <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white/80 dark:bg-white/10 shadow-sm"><i data-lucide="delete" class="w-6 h-6 mx-auto"></i></button>
-          <button type="button" onclick="window.calcPress('0')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">0</button>
-          <button type="button" onclick="window.calcPress('.')" class="calc-btn text-slate-800 dark:text-white text-3xl bg-white/80 dark:bg-white/10 shadow-sm">.</button>
-      </div>
-  </div>`;
+  </div>';
 }
 
 // ================= DASHBOARD =================
