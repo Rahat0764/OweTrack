@@ -708,27 +708,26 @@ window.saveContact = async (id) => {
   } catch(e) { window.showToast(translateErr(e.message), 'error'); }
 };
 
-
-// ================= CONTACT DETAIL =================
-window.openContact = (id) => { window._openContactId = id; window._entryType = 'gave'; window.renderContent(); };
-window.closeContact = () => { window._openContactId = null; window.renderContent(); };
-
 // Keyboard interaction logic
 window.openCalc = () => {
     const calc = document.getElementById('calc-keyboard');
     const main = document.getElementById('mainContentScroll') || document.querySelector('main');
     if(calc) {
+        // Remove old inline styles forcing it to center
+        calc.style.top = ''; 
+        calc.style.left = ''; 
+        calc.style.transform = ''; 
+        calc.style.width = '';
+        
         calc.style.visibility = 'visible';
         requestAnimationFrame(() => {
             calc.classList.remove('translate-y-full');
             if(main) {
-                // Add padding so bottom content isn't hidden behind keyboard
                 main.style.paddingBottom = `${calc.offsetHeight + 20}px`;
                 setTimeout(() => {
                     const inputRow = document.getElementById('amount-input-row');
                     if(inputRow) {
-                        // Scroll the input strictly to the top/visible area
-                        inputRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        inputRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 }, 100);
             }
@@ -861,7 +860,7 @@ function buildContactDetail(id) {
   </div>
   
   <!-- Horizontal Full-width Bottom Keyboard -->
-  <div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 w-full z-[200] flex flex-col glass dark:bg-[#1B1638]/95 backdrop-blur-3xl rounded-t-3xl border-t border-slate-200 dark:border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.4)] transition-transform duration-300 translate-y-full pb-safe" style="visibility: hidden;">
+  <div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 w-full z-[9999] flex flex-col glass dark:bg-[#1B1638]/95 backdrop-blur-3xl rounded-t-3xl border-t border-slate-200 dark:border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.4)] transition-transform duration-300 translate-y-full pb-safe" style="visibility: hidden;">
       <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-1 cursor-pointer hover:bg-slate-400 transition-colors" onclick="window.closeCalc()"></div>
       <div class="grid grid-cols-4 gap-1.5 p-3 pt-1">
           <button type="button" onclick="window.calcPress('AC')" class="calc-btn text-oxblood bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-sm">AC</button>
