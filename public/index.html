@@ -83,7 +83,7 @@ tailwind.config = {
   .calc-btn {
       padding: 0;
       height: 100%;
-      min-height: 44px;
+      min-height: 52px;
       border-radius: 12px;
       transition: all 0.1s;
       font-family: 'Space Grotesk', monospace;
@@ -211,7 +211,6 @@ window.withTimeout = (promise, ms, errorMsg = 'Request timed out') => {
   return Promise.race([Promise.resolve(promise).finally(() => clearTimeout(timer)), timeoutPromise]);
 };
 
-// Updated bnNum: properly handles decimals up to 2 places instead of strict Math.round()
 const bnNum = (n) => {
   let numStr = Number(Number(n).toFixed(2)).toString();
   if (window.lang === 'bn') {
@@ -280,12 +279,13 @@ window._feedbackRating = 0;
 window._myFeedback = []; window._myFeedbackUnreadCount = 0;
 window._feedbackOpen = false; window._fabDocked = false;
 
-// Simple comment: Handle clicking outside calculator to close
+// Handle clicking outside calculator to close
 document.addEventListener('pointerdown', (e) => {
     const calc = document.getElementById('calc-keyboard');
     const amtInput = document.getElementById('entryAmount');
+    const saveBtn = document.getElementById('entrySaveBtn');
     if (calc && calc.style.visibility === 'visible') {
-        if (!calc.contains(e.target) && e.target !== amtInput) {
+        if (!calc.contains(e.target) && e.target !== amtInput && e.target !== saveBtn && !e.target.closest('#entrySaveBtn')) {
             window.closeCalc();
         }
     }
@@ -550,66 +550,9 @@ function getDevCreditBar() {
   </div>`;
 }
 
-function buildLanding() {
-  return `
-  <div class="flex-1 w-full flex flex-col justify-between relative bg-glow bg-[#F3F0FF] dark:bg-[#120E29] min-h-[100dvh]">
-    <div class="flex-1 flex flex-col items-center justify-center px-4 py-8 max-w-md mx-auto w-full z-10">
-      <div class="flex flex-col items-center text-center fade-in mb-8 shrink-0 w-full mt-auto">
-        <div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-steel to-brass flex items-center justify-center shadow-xl mb-5"><i data-lucide="arrow-left-right" class="w-9 h-9 text-white"></i></div>
-        <p class="text-[10px] font-bold uppercase tracking-[0.3em] text-brass mb-1">Private Account Book</p>
-        <h1 class="disp text-5xl font-extrabold mb-3 tracking-tight text-slate-800 dark:text-white leading-none">Ledger</h1>
-        <p class="text-sm text-slate-600 dark:text-slate-400 font-medium px-4">A quiet place to keep track of who owes you, and who you owe.</p>
-        ${(!window.isApp && window.CFG?.apkUrl) ? `<div class="mt-4"><a href="${window.CFG.apkUrl}" class="px-6 py-3 bg-brass text-[#120E29] rounded-2xl font-bold text-sm shadow-lg shadow-brass/20 flex items-center justify-center gap-2 max-w-[200px] mx-auto active:scale-95 transition-all"><i data-lucide="download" class="w-4 h-4"></i> Install App</a></div>` : ''}
-      </div>
-      <div class="w-full shrink-0 fade-in pop-in pb-4 mb-auto">
-        <div class="glass rounded-3xl w-full flex flex-col items-center relative shadow-xl overflow-hidden">
-          <div class="pt-8 px-8 md:px-10 pb-8 md:pb-10 w-full flex flex-col items-center">
-          <h3 class="disp font-bold text-xl mb-1 text-center">Open your ledger</h3>
-          <p class="text-xs text-slate-500 mb-6 text-center">Sign in — every account keeps its own private book</p>
-          <div class="grid grid-cols-1 gap-3 w-full">
-            <button onclick="window.loginProvider('google')" class="flex items-center justify-center gap-2 bg-white dark:bg-white/5 text-slate-800 dark:text-white px-4 py-3.5 rounded-2xl font-bold shadow-sm active:scale-95 transition-all border border-slate-200 dark:border-white/10 text-sm hover:bg-slate-50 dark:hover:bg-white/10">
-              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.47c-.28 1.5-1.13 2.78-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.11C3.25 21.3 7.31 24 12 24z"/><path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.9 12c0-.79.14-1.56.37-2.28V6.61H1.27A11.98 11.98 0 0 0 0 12c0 1.94.46 3.77 1.27 5.39l4-3.11z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.7 1.27 6.61l4 3.11C6.22 6.86 8.87 4.75 12 4.75z"/></svg> Continue with Google
-            </button>
-            <button onclick="window.loginProvider('github')" class="flex items-center justify-center gap-2 bg-[#120E29] dark:bg-white/5 text-white px-4 py-3.5 rounded-2xl font-bold shadow-sm active:scale-95 transition-all text-sm hover:bg-black dark:hover:bg-white/10 border border-transparent dark:border-white/10">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> Continue with GitHub
-            </button>
-          </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="w-full shrink-0 flex justify-center fade-in pb-6 pt-2">
-       <div class="px-4 py-2 rounded-2xl bg-white/50 dark:bg-white/5 border border-slate-900/10 dark:border-white/10 text-[10px] font-bold text-slate-500 flex items-center gap-2 shadow-sm">
-         Developed by <a href="${window.CFG?.developerLinkedin || '#'}" class="text-brass hover:underline">Rahat</a>
-         <span>&bull;</span>
-         <a href="${window.CFG?.developerGithub || '#'}" class="flex items-center gap-1 hover:text-slate-700 dark:hover:text-white transition-colors">
-           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> GitHub
-         </a>
-       </div>
-    </div>
-  </div>`;
-}
-
-function getAccountBar() {
-  const p = window.profile || {}; const s = window.session;
-  if (!s?.user) return '';
-  const email = getDisplayEmail();
-  const name = p.full_name || s.user.user_metadata?.full_name || s.user.user_metadata?.name || 'User';
-  const avatar = p.avatar_url || s.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
-  return `
-    <div class="w-full max-w-sm mx-auto mb-6 px-4 py-3 rounded-2xl bg-white/60 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center gap-3 text-left shadow-sm">
-      <img src="${avatar}" class="w-10 h-10 rounded-full border-2 border-brass/30 object-cover shrink-0">
-      <div class="min-w-0 flex-1">
-        <p class="text-[9px] uppercase tracking-widest text-slate-400 font-bold">${_t('signed_in_as')}</p>
-        <p class="text-xs font-bold truncate text-slate-800 dark:text-white">${name}</p>
-        <p class="text-[10px] text-slate-500 truncate">${email}</p>
-      </div>
-      <button onclick="window.switchAccount()" class="px-3 py-2 rounded-2xl bg-slate-800 dark:bg-white text-white dark:text-slate-900 text-[10px] font-bold shadow-sm shrink-0">${_t('switch_account')}</button>
-    </div>`;
-}
-
 function buildSuspended(){
-  const reason = window.profile?.suspend_reason || (window.lang==='bn' ? 'শর্তাবলী লঙ্ঘন।' : 'Violation of terms.');
+  const r = window.profile?.suspend_reason;
+  const reason = (r && r.trim().length > 0) ? r : (window.lang==='bn' ? 'শর্তাবলী লঙ্ঘন।' : 'Violation of terms.');
   const waLink = window.CFG?.developerWhatsapp || '#';
   return `<div class="flex-1 flex flex-col items-center justify-center px-6 text-center fade-in">
     <div class="w-16 h-16 rounded-full bg-oxblood/10 text-oxblood flex items-center justify-center mb-5 border border-oxblood/20"><i data-lucide="shield-off" class="w-8 h-8"></i></div>
@@ -731,6 +674,7 @@ function buildTabContent() {
 }
 
 // ================= DASHBOARD =================
+  // ================= DASHBOARD =================
 function buildDashboard() {
   const p = window.profile || {};
   const { get, pay, net } = overallStats();
@@ -905,11 +849,11 @@ window.saveContact = async (id) => {
 window.openContact = (id) => { window._openContactId = id; window._entryType = 'gave'; window.renderContent(); };
 window.closeContact = () => { window._openContactId = null; window.renderContent(); };
 
-// Simple comment: Keyboard interaction logic
+// Keyboard interaction logic
 window.openCalc = () => {
     const calc = document.getElementById('calc-keyboard');
     const nav = document.getElementById('mobile-nav');
-    const main = document.getElementById('mainContent');
+    const main = document.getElementById('mainContentScroll') || document.querySelector('main');
     if(calc) {
         calc.style.visibility = 'visible';
         requestAnimationFrame(() => {
@@ -919,8 +863,8 @@ window.openCalc = () => {
                 main.style.paddingBottom = `${calc.offsetHeight + 20}px`;
                 setTimeout(() => {
                     const inputRow = document.getElementById('amount-input-row');
-                    if(inputRow) inputRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 50);
+                    if(inputRow) inputRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
             }
         });
     }
@@ -929,7 +873,7 @@ window.openCalc = () => {
 window.closeCalc = () => {
     const calc = document.getElementById('calc-keyboard');
     const nav = document.getElementById('mobile-nav');
-    const main = document.getElementById('mainContent');
+    const main = document.getElementById('mainContentScroll') || document.querySelector('main');
     if(calc) {
         calc.classList.add('translate-y-full');
         if(nav) nav.style.transform = 'translateY(0)';
@@ -951,6 +895,7 @@ window.calcPress = (key) => {
             let res = eval(expr);
             if (res === Infinity || isNaN(res)) throw new Error('invalid');
             val = Number(Number(res).toFixed(2)).toString();
+            window.closeCalc();
         } catch(e) { /* ignore */ }
     }
     else {
@@ -965,7 +910,7 @@ window.calcPress = (key) => {
     input.value = val;
 };
 
-// Simple comment: Handle external keyboard keys
+// Handle external keyboard keys
 window.handleCalcKeydown = (e) => {
     const allowedKeys = ['0','1','2','3','4','5','6','7','8','9','.','Backspace','Delete','Enter','=','+','-','*','/','%'];
     if (!allowedKeys.includes(e.key)) { 
@@ -975,7 +920,7 @@ window.handleCalcKeydown = (e) => {
     e.preventDefault();
     let k = e.key;
     if (k === 'Backspace' || k === 'Delete') window.calcPress('DEL');
-    else if (k === 'Enter' || k === '=') { window.calcPress('='); window.closeCalc(); }
+    else if (k === 'Enter' || k === '=') { window.calcPress('='); }
     else if (k === '*') window.calcPress('×');
     else if (k === '/') window.calcPress('÷');
     else if (k === '-') window.calcPress('−');
@@ -1051,32 +996,32 @@ function buildContactDetail(id) {
     </div>
   </div>
   
-  <!-- Simple comment: Horizontal Full-width Bottom Keyboard -->
+  <!-- Horizontal Full-width Bottom Keyboard -->
   <div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 w-full z-[200] flex flex-col glass dark:bg-[#1B1638]/95 backdrop-blur-3xl rounded-t-3xl border-t border-slate-200 dark:border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.4)] transition-transform duration-300 translate-y-full pb-safe" style="visibility: hidden;">
-      <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-1 cursor-pointer" onclick="window.closeCalc()"></div>
-      <div class="grid grid-cols-4 gap-2 p-3">
+      <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-1 cursor-pointer hover:bg-slate-400 transition-colors" onclick="window.closeCalc()"></div>
+      <div class="grid grid-cols-4 gap-2 p-4 pt-2">
           <button type="button" onclick="window.calcPress('AC')" class="calc-btn text-oxblood bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-sm">AC</button>
           <button type="button" onclick="window.calcPress('%')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-xl">%</button>
           <button type="button" onclick="window.calcPress('÷')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">÷</button>
           <button type="button" onclick="window.calcPress('×')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">×</button>
 
-          <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">7</button>
-          <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">8</button>
-          <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">9</button>
+          <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">7</button>
+          <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">8</button>
+          <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">9</button>
           <button type="button" onclick="window.calcPress('−')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">−</button>
 
-          <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">4</button>
-          <button type="button" onclick="window.calcPress('5')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">5</button>
-          <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">6</button>
+          <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">4</button>
+          <button type="button" onclick="window.calcPress('5')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">5</button>
+          <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">6</button>
           <button type="button" onclick="window.calcPress('+')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">+</button>
 
-          <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">1</button>
-          <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">2</button>
-          <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">3</button>
+          <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">1</button>
+          <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">2</button>
+          <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">3</button>
           <button type="button" onclick="window.calcPress('=')" class="calc-btn bg-brass text-[#120E29] row-span-2 text-3xl shadow-md font-extrabold">=</button>
 
-          <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white/80 dark:bg-white/10 shadow-sm"><i data-lucide="delete" class="w-6 h-6 mx-auto"></i></button>
-          <button type="button" onclick="window.calcPress('0')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">0</button>
+          <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white/80 dark:bg-white/10 shadow-sm"><i data-lucide="delete" class="w-7 h-7 mx-auto"></i></button>
+          <button type="button" onclick="window.calcPress('0')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-2xl">0</button>
           <button type="button" onclick="window.calcPress('.')" class="calc-btn text-slate-800 dark:text-white text-3xl bg-white/80 dark:bg-white/10 shadow-sm">.</button>
       </div>
   </div>`;
@@ -1782,7 +1727,7 @@ function buildManage(){
       content = `<div class="p-10 text-center text-slate-500 text-sm font-medium flex flex-col items-center justify-center min-h-[40vh] gap-4"><i data-lucide="alert-triangle" class="w-8 h-8 mx-auto text-oxblood"></i><p>${window._manageError}</p><button onclick="window.loadManageUsers()" class="px-5 py-2.5 rounded-2xl bg-steel text-white text-xs font-bold shadow-md active:scale-95 transition-transform">Retry</button></div>`;
     } else {
       content = window._manageUsers.map(u=>`
-        <div onclick="window.showUserDetail('${u.id}')" class="glass rounded-2xl p-5 ${u.is_suspended?'border-amber-500/40 bg-amber-500/5':''} shadow-sm cursor-pointer active:scale-[0.99] transition-transform">
+        <div onclick="window.showUserDetail('${u.id}')" class="glass rounded-2xl p-5 ${u.is_suspended?'border border-amber-500/40 bg-amber-500/5':''} shadow-sm cursor-pointer active:scale-[0.99] transition-transform">
           <div class="flex items-center gap-3 mb-3">
             <img src="${u.avatar_url || 'https://api.dicebear.com/7.x/initials/svg?seed='+encodeURIComponent(u.full_name||'U')}" class="w-11 h-11 rounded-full object-cover border shadow-sm shrink-0">
             <div class="min-w-0 flex-1">
@@ -1798,10 +1743,10 @@ function buildManage(){
           ${u.isAdmin ? `<div class="mt-3 pt-3 border-t border-slate-200 dark:border-white/10 text-center"><span class="text-[11px] text-slate-400 font-medium">This is your admin account — actions disabled</span></div>` : `
           <div class="flex gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-white/10">
             ${u.is_suspended
-              ? `<button onclick="event.stopPropagation(); window.unsuspendUser('${u.id}')" class="flex-1 py-2 rounded-2xl bg-brass/10 text-brass border border-brass/30 hover:bg-brass/20 text-[11px] font-bold transition-colors">Unsuspend</button>`
-              : `<button onclick="event.stopPropagation(); window.suspendUser('${u.id}')" class="flex-1 py-2 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/30 hover:bg-amber-500/20 text-[11px] font-bold transition-colors">Suspend</button>`
+              ? `<button onclick="event.stopPropagation(); window.unsuspendUser('${u.id}')" class="flex-1 py-2.5 rounded-2xl bg-brass/15 text-brass border border-brass/30 hover:bg-brass/25 text-[11px] font-extrabold transition-colors shadow-sm">Unsuspend</button>`
+              : `<button onclick="event.stopPropagation(); window.suspendUser('${u.id}')" class="flex-1 py-2.5 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-500 border border-amber-500/30 hover:bg-amber-500/25 text-[11px] font-extrabold transition-colors shadow-sm">Suspend</button>`
             }
-            <button onclick="event.stopPropagation(); window.banUser('${u.id}')" class="flex-1 py-2 rounded-2xl bg-oxblood/10 text-oxblood border border-oxblood/30 hover:bg-oxblood/20 text-[11px] font-bold transition-colors">Ban & Erase</button>
+            <button onclick="event.stopPropagation(); window.banUser('${u.id}')" class="flex-1 py-2.5 rounded-2xl bg-oxblood/15 text-oxblood border border-oxblood/30 hover:bg-oxblood/25 text-[11px] font-extrabold transition-colors shadow-sm">Ban & Erase</button>
           </div>`}
         </div>`).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">No users found.</div>`;
     }
