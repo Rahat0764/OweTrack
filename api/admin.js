@@ -12,7 +12,6 @@ module.exports = async (req, res) => {
   try {
     switch (action) {
       case 'list_users': {
-        // Fetch all auth users explicitly to guarantee emails & google metadata are captured
         const { data: authData, error: authErr } = await sb.auth.admin.listUsers();
         if (authErr) throw authErr;
         const authUsers = authData.users || [];
