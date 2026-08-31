@@ -12,7 +12,12 @@ module.exports = async (req, res) => {
   try {
     switch (action) {
       case 'list_users': {
-        const { data: profiles, error: pErr } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
+        // Fetch all auth users explicitly to guarantee emails & google metadata are captured
+        const { data: authData, error: authErr } = await sb.auth.admin.listUsers();
+        if (authErr) throw authErr;
+        const authUsers = authData.users || [];
+
+        const { data: profiles, error: pErr } = await sb.from('profiles').select('*');
         if (pErr) throw pErr;
 
         const { data: contacts, error: cErr } = await sb.from('contacts').select('id, user_id');
@@ -31,14 +36,38 @@ module.exports = async (req, res) => {
           totals[e.user_id].count += 1;
         });
 
-        const users = (profiles || []).map(p => ({
-          ...p,
-          isAdmin: !!superEmail && (p.email || '').toLowerCase().trim() === superEmail,
-          contactCount: contactCounts[p.id] || 0,
-          totalGave: totals[p.id]?.gave || 0,
-          totalTook: totals[p.id]?.took || 0,
-          entryCount: totals[p.id]?.count || 0
-        }));
+        // Merge Auth Data with Profiles Data securely
+        const usersMap = {};
+        authUsers.forEach(u => {
+          const meta = u.user_metadata || {};
+          usersMap[u.id] = {
+            id: u.id,
+            email: u.email || '',
+            full_name: meta.full_name || meta.name || 'User',
+            avatar_url: meta.avatar_url || meta.picture || '',
+            is_suspended: false,
+            created_at: u.created_at
+          };
+        });
+
+        (profiles || []).forEach(p => {
+          if (!usersMap[p.id]) {
+            usersMap[p.id] = { id: p.id, email: p.email || '', full_name: 'User', created_at: p.created_at };
+          }
+          if (p.full_name) usersMap[p.id].full_name = p.full_name;
+          if (p.avatar_url) usersMap[p.id].avatar_url = p.avatar_url;
+          usersMap[p.id].is_suspended = p.is_suspended;
+          usersMap[p.id].pin_set = p.pin_set;
+        });
+
+        const users = Object.values(usersMap).map(u => ({
+          ...u,
+          isAdmin: !!superEmail && (u.email || '').toLowerCase().trim() === superEmail,
+          contactCount: contactCounts[u.id] || 0,
+          totalGave: totals[u.id]?.gave || 0,
+          totalTook: totals[u.id]?.took || 0,
+          entryCount: totals[u.id]?.count || 0
+        })).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         return res.status(200).json({ users });
       }
