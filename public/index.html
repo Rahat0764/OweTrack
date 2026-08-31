@@ -79,11 +79,11 @@ tailwind.config = {
   .ring-track{stroke:rgba(80,60,160,.14)} .dark .ring-track{stroke:rgba(255,255,255,.1)}
   .ring-prog{stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.16,1,.3,1), stroke .4s ease;}
 
-  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 24px); }
   .calc-btn {
       padding: 0;
       height: 100%;
-      min-height: 40px;
+      min-height: 44px;
       border-radius: 12px;
       transition: all 0.1s;
       font-family: 'Space Grotesk', monospace;
@@ -94,7 +94,6 @@ tailwind.config = {
   }
   .calc-btn:active { transform: scale(0.92); filter: brightness(0.9); }
   .dark .calc-btn:active { filter: brightness(1.2); }
-  
 </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100 flex flex-col h-full w-full relative">
@@ -281,6 +280,17 @@ window._feedbackRating = 0;
 window._myFeedback = []; window._myFeedbackUnreadCount = 0;
 window._feedbackOpen = false; window._fabDocked = false;
 
+// Simple comment: Handle clicking outside calculator to close
+document.addEventListener('pointerdown', (e) => {
+    const calc = document.getElementById('calc-keyboard');
+    const amtInput = document.getElementById('entryAmount');
+    if (calc && calc.style.visibility === 'visible') {
+        if (!calc.contains(e.target) && e.target !== amtInput) {
+            window.closeCalc();
+        }
+    }
+});
+
 function getIdentities() {
   const identities = window.session?.user?.identities || [];
   const gId = identities.find(i => i.provider === 'google');
@@ -401,7 +411,6 @@ window.loadProfile = async () => {
   if (!session?.user?.id) return false;
   const userId = session.user.id;
   
-  // Extracting name/avatar better for Google Logins
   let metaName = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
   let metaAvatar = session.user.user_metadata?.avatar_url;
   
@@ -430,13 +439,13 @@ window.loadProfile = async () => {
         }
         return true; 
     }
-    const st = await window.callApi('/api/pin', { action: 'status', accessToken: session.access_token }).catch(()=>({pin_set:false, is_suspended:false}));
-    window.profile = { id: userId, full_name: defaultName, email: session.user.email || '', avatar_url: defaultAvatar, pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: null };
+    const st = await window.callApi('/api/pin', { action: 'status', accessToken: session.access_token }).catch(()=>({pin_set:false, is_suspended:false, suspend_reason:null}));
+    window.profile = { id: userId, full_name: defaultName, email: session.user.email || '', avatar_url: defaultAvatar, pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: st.suspend_reason };
     await window.supa.from('profiles').upsert({ id: userId, full_name: window.profile.full_name, email: window.profile.email, avatar_url: window.profile.avatar_url }).catch(()=>{});
     return true;
   } catch(e) {
-    const st = await window.callApi('/api/pin', { action: 'status', accessToken: session.access_token }).catch(()=>({pin_set:false, is_suspended:false}));
-    window.profile = { id: userId, full_name: defaultName, email: session.user.email || '', avatar_url: defaultAvatar, pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: null };
+    const st = await window.callApi('/api/pin', { action: 'status', accessToken: session.access_token }).catch(()=>({pin_set:false, is_suspended:false, suspend_reason:null}));
+    window.profile = { id: userId, full_name: defaultName, email: session.user.email || '', avatar_url: defaultAvatar, pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: st.suspend_reason };
     return true;
   }
 };
@@ -446,7 +455,6 @@ window.loadData = async (silent = false) => {
   if (!userId) return false;
   window._isDataLoading = true;
   
-  // Update inner content if possible, otherwise avoid full re-render
   if (window.session && document.getElementById('mainContent')) window.renderContent();
   
   try {
@@ -689,11 +697,11 @@ function buildShell(innerHtml) {
       </header>
       <div class="md:hidden px-3"><div class="glass rounded-2xl mt-3 overflow-hidden"><div class="max-w-3xl mx-auto">${getDevCreditBar()}</div></div></div>
       <div class="hidden md:block px-3 pt-3"><div class="glass rounded-2xl overflow-hidden">${getDevCreditBar()}</div></div>
-      <main class="flex-1 overflow-y-auto w-full pb-28 md:pb-10 pt-4 px-4 md:px-8 fade-in hide-scrollbar relative block h-full">
-        <div id="mainContent" class="max-w-4xl mx-auto">${innerHtml}</div>
+      <main class="flex-1 overflow-y-auto w-full pb-28 md:pb-10 pt-4 px-4 md:px-8 fade-in hide-scrollbar relative block h-full transition-all duration-300" id="mainContentScroll">
+        <div id="mainContent" class="max-w-4xl mx-auto transition-all duration-300">${innerHtml}</div>
       </main>
       ${buildFeedbackFab()}
-      <nav class="md:hidden fixed bottom-5 inset-x-0 mx-auto w-[92%] max-w-md glass z-40 rounded-3xl shadow-[0_8px_32px_rgba(80,60,160,0.25)]">
+      <nav id="mobile-nav" class="md:hidden fixed bottom-5 inset-x-0 mx-auto w-[92%] max-w-md glass z-40 rounded-3xl shadow-[0_8px_32px_rgba(80,60,160,0.25)] transition-transform duration-300">
         <div class="flex justify-around items-center h-[64px] px-1.5">${navButtons}</div>
       </nav>
     </div>
@@ -897,86 +905,36 @@ window.saveContact = async (id) => {
 window.openContact = (id) => { window._openContactId = id; window._entryType = 'gave'; window.renderContent(); };
 window.closeContact = () => { window._openContactId = null; window.renderContent(); };
 
-// Calculator Logic for Input Amount
-// ================= FLOATING CALCULATOR LOGIC =================
-window.calcDrag = { active: false, startX: 0, startY: 0, initialLeft: 0, initialTop: 0 };
-window.calcResize = { active: false, startX: 0, startY: 0, initialW: 0, initialH: 0 };
-
-window.startCalcDrag = (e) => {
-    if(e.target.closest('button')) return; // Ignore if clicked on header buttons
-    window.calcDrag.active = true;
-    window.calcDrag.startX = e.clientX; window.calcDrag.startY = e.clientY;
-    const calc = document.getElementById('calc-keyboard');
-    const rect = calc.getBoundingClientRect();
-    window.calcDrag.initialLeft = rect.left; window.calcDrag.initialTop = rect.top;
-    calc.style.transform = 'none'; // Lock position to raw pixels
-    calc.style.left = rect.left + 'px'; calc.style.top = rect.top + 'px';
-    calc.style.bottom = 'auto'; calc.style.right = 'auto';
-    document.getElementById('calc-header').setPointerCapture(e.pointerId);
-};
-
-window.startCalcResize = (e) => {
-    window.calcResize.active = true;
-    window.calcResize.startX = e.clientX; window.calcResize.startY = e.clientY;
-    const calc = document.getElementById('calc-keyboard');
-    window.calcResize.initialW = calc.offsetWidth; window.calcResize.initialH = calc.offsetHeight;
-    const rect = calc.getBoundingClientRect();
-    calc.style.transform = 'none';
-    calc.style.left = rect.left + 'px'; calc.style.top = rect.top + 'px';
-    calc.style.bottom = 'auto'; calc.style.right = 'auto';
-    document.getElementById('calc-resizer').setPointerCapture(e.pointerId);
-};
-
-// Unified listeners for drag and resize to survive DOM rewrites
-document.addEventListener('pointermove', (e) => {
-    if (window.calcDrag.active) {
-        const calc = document.getElementById('calc-keyboard');
-        const dx = e.clientX - window.calcDrag.startX;
-        const dy = e.clientY - window.calcDrag.startY;
-        calc.style.left = (window.calcDrag.initialLeft + dx) + 'px';
-        calc.style.top = (window.calcDrag.initialTop + dy) + 'px';
-    }
-    if (window.calcResize.active) {
-        const calc = document.getElementById('calc-keyboard');
-        const dx = e.clientX - window.calcResize.startX;
-        const dy = e.clientY - window.calcResize.startY;
-        calc.style.width = Math.max(220, window.calcResize.initialW + dx) + 'px'; // min width limits
-        calc.style.height = Math.max(300, window.calcResize.initialH + dy) + 'px'; // min height limits
-    }
-});
-document.addEventListener('pointerup', () => { window.calcDrag.active = false; window.calcResize.active = false; });
-document.addEventListener('pointercancel', () => { window.calcDrag.active = false; window.calcResize.active = false; });
-
+// Simple comment: Keyboard interaction logic
 window.openCalc = () => {
     const calc = document.getElementById('calc-keyboard');
+    const nav = document.getElementById('mobile-nav');
+    const main = document.getElementById('mainContent');
     if(calc) {
-        calc.classList.remove('hidden');
+        calc.style.visibility = 'visible';
         requestAnimationFrame(() => {
-            calc.classList.remove('opacity-0', 'scale-95');
-            calc.classList.add('opacity-100', 'scale-100');
+            calc.classList.remove('translate-y-full');
+            if(nav) nav.style.transform = `translateY(-${calc.offsetHeight}px)`;
+            if(main) {
+                main.style.paddingBottom = `${calc.offsetHeight + 20}px`;
+                setTimeout(() => {
+                    const inputRow = document.getElementById('amount-input-row');
+                    if(inputRow) inputRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
+            }
         });
     }
 };
 
 window.closeCalc = () => {
     const calc = document.getElementById('calc-keyboard');
+    const nav = document.getElementById('mobile-nav');
+    const main = document.getElementById('mainContent');
     if(calc) {
-        calc.classList.remove('opacity-100', 'scale-100');
-        calc.classList.add('opacity-0', 'scale-95');
-        setTimeout(() => calc.classList.add('hidden'), 200);
-    }
-};
-
-window.resetCalc = () => {
-    const calc = document.getElementById('calc-keyboard');
-    if(calc) {
-        calc.style.width = '280px';
-        calc.style.height = '380px'; // Compact default height
-        calc.style.left = '50%';
-        calc.style.top = '50%';
-        calc.style.bottom = 'auto';
-        calc.style.right = 'auto';
-        calc.style.transform = 'translate(-50%, -50%)';
+        calc.classList.add('translate-y-full');
+        if(nav) nav.style.transform = 'translateY(0)';
+        if(main) main.style.paddingBottom = '0px';
+        setTimeout(() => { calc.style.visibility = 'hidden'; }, 300);
     }
 };
 
@@ -1005,6 +963,23 @@ window.calcPress = (key) => {
         }
     }
     input.value = val;
+};
+
+// Simple comment: Handle external keyboard keys
+window.handleCalcKeydown = (e) => {
+    const allowedKeys = ['0','1','2','3','4','5','6','7','8','9','.','Backspace','Delete','Enter','=','+','-','*','/','%'];
+    if (!allowedKeys.includes(e.key)) { 
+        if(!['Tab','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) e.preventDefault(); 
+        return; 
+    }
+    e.preventDefault();
+    let k = e.key;
+    if (k === 'Backspace' || k === 'Delete') window.calcPress('DEL');
+    else if (k === 'Enter' || k === '=') { window.calcPress('='); window.closeCalc(); }
+    else if (k === '*') window.calcPress('×');
+    else if (k === '/') window.calcPress('÷');
+    else if (k === '-') window.calcPress('−');
+    else window.calcPress(k);
 };
 
 function buildContactDetail(id) {
@@ -1039,11 +1014,11 @@ function buildContactDetail(id) {
       <button type="button" id="tabGaveBtn" onclick="window.setEntryType('gave')" class="flex-1 py-2.5 font-semibold text-[13px] transition-all border-b-2 -mb-0.5 ${isGave?'border-brass text-brass':'border-transparent text-slate-500'}">${_t('gave')}</button>
       <button type="button" id="tabTookBtn" onclick="window.setEntryType('took')" class="flex-1 py-2.5 font-semibold text-[13px] transition-all border-b-2 -mb-0.5 ${!isGave?'border-oxblood text-oxblood':'border-transparent text-slate-500'}">${_t('took')}</button>
     </div>
-    <div class="flex items-end gap-3 mb-3">
+    <div id="amount-input-row" class="flex items-end gap-3 mb-3">
       <div class="flex-1">
         <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('amount_label')}</label>
         <div class="relative"><span class="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">৳</span>
-        <input id="entryAmount" inputmode="none" type="text" placeholder="0.00" class="w-full pl-10 pr-4 py-3 rounded-2xl glass-input dyn-focus text-base font-semibold outline-none mono" onfocus="window.openCalc()" onclick="window.openCalc()"></div>
+        <input id="entryAmount" inputmode="none" type="text" placeholder="0.00" class="w-full pl-10 pr-4 py-3 rounded-2xl glass-input dyn-focus text-base font-semibold outline-none mono" onfocus="window.openCalc()" onclick="window.openCalc()" onkeydown="window.handleCalcKeydown(event)"></div>
       </div>
       <div class="w-[60px] shrink-0 flex flex-col items-center">
         <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block text-center w-full">${window.lang==='bn'?'তারিখ':'DATE'}</label>
@@ -1076,51 +1051,33 @@ function buildContactDetail(id) {
     </div>
   </div>
   
-  <div id="calc-keyboard" class="fixed z-[200] hidden flex-col glass dark:bg-[#1B1638]/70 backdrop-blur-2xl rounded-3xl border border-white/40 dark:border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.4)] transition-all duration-200 opacity-0 scale-95" style="width: 280px; height: 380px; left: 50%; top: 50%; transform: translate(-50%, -50%); transform-origin: center;">
-      <!-- Header / Drag Handle -->
-      <div id="calc-header" onpointerdown="window.startCalcDrag(event)" class="flex justify-between items-center px-4 py-2 bg-white/30 dark:bg-white/5 border-b border-slate-300 dark:border-white/5 cursor-move touch-none rounded-t-3xl shrink-0">
-          <span class="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><i data-lucide="calculator" class="w-3.5 h-3.5"></i> Calc</span>
-          <div class="flex items-center gap-1.5">
-              <button type="button" onclick="window.resetCalc()" class="p-1.5 text-slate-500 hover:text-brass font-bold transition-colors bg-white/50 dark:bg-white/10 rounded-xl shadow-sm" title="Reset Size/Position"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i></button>
-              <button type="button" onclick="window.closeCalc()" class="p-1.5 text-slate-500 hover:text-oxblood font-bold transition-colors bg-white/50 dark:bg-white/10 rounded-xl shadow-sm"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
-          </div>
-      </div>
-      
-      <!-- Keys -->
-      <div class="grid grid-cols-4 gap-1.5 p-2 flex-1 overflow-hidden h-full">
+  <!-- Simple comment: Horizontal Full-width Bottom Keyboard -->
+  <div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 w-full z-[200] flex flex-col glass dark:bg-[#1B1638]/95 backdrop-blur-3xl rounded-t-3xl border-t border-slate-200 dark:border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.4)] transition-transform duration-300 translate-y-full pb-safe" style="visibility: hidden;">
+      <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-1 cursor-pointer" onclick="window.closeCalc()"></div>
+      <div class="grid grid-cols-4 gap-2 p-3">
           <button type="button" onclick="window.calcPress('AC')" class="calc-btn text-oxblood bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-sm">AC</button>
-          <button type="button" onclick="window.calcPress('%')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-lg">%</button>
-          <button type="button" onclick="window.calcPress('÷')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-lg">÷</button>
-          <button type="button" onclick="window.calcPress('×')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-lg">×</button>
+          <button type="button" onclick="window.calcPress('%')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-xl">%</button>
+          <button type="button" onclick="window.calcPress('÷')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">÷</button>
+          <button type="button" onclick="window.calcPress('×')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">×</button>
 
-          <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">7</button>
-          <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">8</button>
-          <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">9</button>
-          <button type="button" onclick="window.calcPress('−')" class="calc-btn text-brass text-xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">−</button>
+          <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">7</button>
+          <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">8</button>
+          <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">9</button>
+          <button type="button" onclick="window.calcPress('−')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">−</button>
 
-          <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">4</button>
-          <button type="button" onclick="window.calcPress('5')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">5</button>
-          <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">6</button>
-          <button type="button" onclick="window.calcPress('+')" class="calc-btn text-brass text-xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">+</button>
+          <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">4</button>
+          <button type="button" onclick="window.calcPress('5')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">5</button>
+          <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">6</button>
+          <button type="button" onclick="window.calcPress('+')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">+</button>
 
-          <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">1</button>
-          <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">2</button>
-          <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">3</button>
-          <button type="button" onclick="window.calcPress('=')" class="calc-btn bg-brass text-[#120E29] row-span-2 text-2xl shadow-md font-extrabold">=</button>
+          <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">1</button>
+          <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">2</button>
+          <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">3</button>
+          <button type="button" onclick="window.calcPress('=')" class="calc-btn bg-brass text-[#120E29] row-span-2 text-3xl shadow-md font-extrabold">=</button>
 
-          <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white/80 dark:bg-white/10 shadow-sm"><i data-lucide="delete" class="w-5 h-5 mx-auto"></i></button>
-          <button type="button" onclick="window.calcPress('0')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-lg">0</button>
-          <button type="button" onclick="window.calcPress('.')" class="calc-btn text-slate-800 dark:text-white text-xl bg-white/80 dark:bg-white/10 shadow-sm">.</button>
-      </div>
-      
-      <!-- Insert Action Button -->
-      <div class="px-2 pb-2 pt-1 shrink-0 relative">
-          <button type="button" onclick="window.closeCalc();" class="w-full py-2.5 rounded-xl bg-slate-800 dark:bg-white text-white dark:text-[#120E29] font-bold shadow-[0_4px_15px_rgba(0,0,0,0.1)] flex items-center justify-center gap-2 text-[13px] active:scale-[0.98] transition-transform">✅ এন্ট্রি বক্সে বসান (Insert)</button>
-      </div>
-
-      <!-- Resize Handle (Bottom Right Corner) -->
-      <div id="calc-resizer" onpointerdown="window.startCalcResize(event)" class="absolute bottom-0 right-0 w-8 h-8 cursor-nwse-resize touch-none flex items-end justify-end p-2 opacity-50 hover:opacity-100 z-50">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="text-slate-500 dark:text-slate-400"><path d="M22 22H12l10-10v10zm0-14L8 22H2l20-20v6z"/></svg>
+          <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white/80 dark:bg-white/10 shadow-sm"><i data-lucide="delete" class="w-6 h-6 mx-auto"></i></button>
+          <button type="button" onclick="window.calcPress('0')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">0</button>
+          <button type="button" onclick="window.calcPress('.')" class="calc-btn text-slate-800 dark:text-white text-3xl bg-white/80 dark:bg-white/10 shadow-sm">.</button>
       </div>
   </div>`;
 }
@@ -1841,10 +1798,10 @@ function buildManage(){
           ${u.isAdmin ? `<div class="mt-3 pt-3 border-t border-slate-200 dark:border-white/10 text-center"><span class="text-[11px] text-slate-400 font-medium">This is your admin account — actions disabled</span></div>` : `
           <div class="flex gap-2 mt-3 pt-3 border-t border-slate-200 dark:border-white/10">
             ${u.is_suspended
-              ? `<button onclick="event.stopPropagation(); window.unsuspendUser('${u.id}')" class="flex-1 py-2 rounded-2xl bg-brass/10 text-brass hover:bg-brass/20 text-[11px] font-bold transition-colors">Unsuspend</button>`
-              : `<button onclick="event.stopPropagation(); window.suspendUser('${u.id}')" class="flex-1 py-2 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-500 hover:bg-amber-500/20 text-[11px] font-bold transition-colors">Suspend</button>`
+              ? `<button onclick="event.stopPropagation(); window.unsuspendUser('${u.id}')" class="flex-1 py-2 rounded-2xl bg-brass/10 text-brass border border-brass/30 hover:bg-brass/20 text-[11px] font-bold transition-colors">Unsuspend</button>`
+              : `<button onclick="event.stopPropagation(); window.suspendUser('${u.id}')" class="flex-1 py-2 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/30 hover:bg-amber-500/20 text-[11px] font-bold transition-colors">Suspend</button>`
             }
-            <button onclick="event.stopPropagation(); window.banUser('${u.id}')" class="flex-1 py-2 rounded-2xl bg-oxblood/10 text-oxblood hover:bg-oxblood/20 text-[11px] font-bold transition-colors">Ban & Erase</button>
+            <button onclick="event.stopPropagation(); window.banUser('${u.id}')" class="flex-1 py-2 rounded-2xl bg-oxblood/10 text-oxblood border border-oxblood/30 hover:bg-oxblood/20 text-[11px] font-bold transition-colors">Ban & Erase</button>
           </div>`}
         </div>`).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">No users found.</div>`;
     }
