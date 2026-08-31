@@ -78,6 +78,21 @@ tailwind.config = {
   .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .ring-track{stroke:rgba(80,60,160,.14)} .dark .ring-track{stroke:rgba(255,255,255,.1)}
   .ring-prog{stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.16,1,.3,1), stroke .4s ease;}
+  
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
+  .calc-btn {
+      padding: 16px 0;
+      font-size: 22px;
+      font-weight: 700;
+      border-radius: 16px;
+      transition: all 0.1s;
+      font-family: 'Space Grotesk', monospace;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+  }
+  .calc-btn:active { transform: scale(0.92); filter: brightness(0.9); }
+  .dark .calc-btn:active { filter: brightness(1.2); }
 </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100 flex flex-col h-full w-full relative">
@@ -195,7 +210,18 @@ window.withTimeout = (promise, ms, errorMsg = 'Request timed out') => {
   return Promise.race([Promise.resolve(promise).finally(() => clearTimeout(timer)), timeoutPromise]);
 };
 
-const bnNum = (n) => window.lang === 'bn' ? String(Math.round(n)).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]) : Number(Math.round(n)).toLocaleString('en-US');
+// Updated bnNum: properly handles decimals up to 2 places instead of strict Math.round()
+const bnNum = (n) => {
+  let numStr = Number(Number(n).toFixed(2)).toString();
+  if (window.lang === 'bn') {
+    return numStr.replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]);
+  } else {
+    const parts = numStr.split('.');
+    parts[0] = Number(parts[0]).toLocaleString('en-US');
+    return parts.join('.');
+  }
+};
+
 const BN_MONTHS = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
 const EN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const formatDate = (dateObj) => {
@@ -372,17 +398,43 @@ window.loadProfile = async () => {
   const session = window.session;
   if (!session?.user?.id) return false;
   const userId = session.user.id;
+  
+  // Extracting name/avatar better for Google Logins
+  let metaName = session.user.user_metadata?.full_name || session.user.user_metadata?.name;
+  let metaAvatar = session.user.user_metadata?.avatar_url;
+  
+  if (!metaName || !metaAvatar) {
+    const { gId, ghId } = getIdentities();
+    if (gId) {
+        metaName = metaName || gId.identity_data.full_name || gId.identity_data.name;
+        metaAvatar = metaAvatar || gId.identity_data.avatar_url || gId.identity_data.picture;
+    } else if (ghId) {
+        metaName = metaName || ghId.identity_data.full_name || ghId.identity_data.name || ghId.identity_data.user_name;
+        metaAvatar = metaAvatar || ghId.identity_data.avatar_url;
+    }
+  }
+  
+  const defaultName = metaName || 'User';
+  const defaultAvatar = metaAvatar || '';
+
   try {
     const { data, error } = await window.withTimeout(window.supa.from('profiles').select('*').eq('id', userId).maybeSingle(), 5000, 'Profile request timed out');
     if (error) throw error;
-    if (data) { if (window.session?.user?.id === userId) window.profile = data; return true; }
+    if (data) { 
+        if (window.session?.user?.id === userId) window.profile = data; 
+        if (!data.full_name && metaName) {
+            window.profile.full_name = metaName;
+            window.supa.from('profiles').update({ full_name: metaName, avatar_url: metaAvatar }).eq('id', userId).catch(()=>{});
+        }
+        return true; 
+    }
     const st = await window.callApi('/api/pin', { action: 'status', accessToken: session.access_token }).catch(()=>({pin_set:false, is_suspended:false}));
-    window.profile = { id: userId, full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User', email: session.user.email || '', avatar_url: session.user.user_metadata?.avatar_url || '', pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: null };
+    window.profile = { id: userId, full_name: defaultName, email: session.user.email || '', avatar_url: defaultAvatar, pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: null };
     await window.supa.from('profiles').upsert({ id: userId, full_name: window.profile.full_name, email: window.profile.email, avatar_url: window.profile.avatar_url }).catch(()=>{});
     return true;
   } catch(e) {
     const st = await window.callApi('/api/pin', { action: 'status', accessToken: session.access_token }).catch(()=>({pin_set:false, is_suspended:false}));
-    window.profile = { id: userId, full_name: session.user.user_metadata?.full_name || 'User', email: session.user.email || '', avatar_url: session.user.user_metadata?.avatar_url || '', pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: null };
+    window.profile = { id: userId, full_name: defaultName, email: session.user.email || '', avatar_url: defaultAvatar, pin_set: st.pin_set, is_suspended: st.is_suspended, suspend_reason: null };
     return true;
   }
 };
@@ -391,7 +443,10 @@ window.loadData = async (silent = false) => {
   const userId = window.session?.user?.id;
   if (!userId) return false;
   window._isDataLoading = true;
-  if (window.session) window.render();
+  
+  // Update inner content if possible, otherwise avoid full re-render
+  if (window.session && document.getElementById('mainContent')) window.renderContent();
+  
   try {
     const [cRes, eRes] = await Promise.all([
       window.supa.from('contacts').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
@@ -408,7 +463,9 @@ window.loadData = async (silent = false) => {
     return false;
   } finally {
     window._isDataLoading = false;
-    if (window.session && window.session.user.id === userId) window.render();
+    if (window.session && window.session.user.id === userId && document.getElementById('mainContent')) {
+        window.renderContent();
+    }
   }
 };
 
@@ -838,6 +895,42 @@ window.saveContact = async (id) => {
 window.openContact = (id) => { window._openContactId = id; window._entryType = 'gave'; window.renderContent(); };
 window.closeContact = () => { window._openContactId = null; window.renderContent(); };
 
+// Calculator Logic for Input Amount
+window.openCalc = () => {
+    const calc = document.getElementById('calc-keyboard');
+    if(calc) calc.classList.remove('translate-y-full');
+};
+window.closeCalc = () => {
+    const calc = document.getElementById('calc-keyboard');
+    if(calc) calc.classList.add('translate-y-full');
+};
+window.calcPress = (key) => {
+    const input = document.getElementById('entryAmount');
+    if (!input) return;
+    let val = input.value || "";
+
+    if (key === 'AC') { val = ""; }
+    else if (key === 'DEL') { val = val.slice(0, -1); }
+    else if (key === '=') {
+        try {
+            let expr = val.replace(/÷/g, '/').replace(/×/g, '*').replace(/−/g, '-');
+            let res = eval(expr);
+            if (res === Infinity || isNaN(res)) throw new Error('invalid');
+            val = Number(Number(res).toFixed(2)).toString();
+        } catch(e) { /* ignore */ }
+    }
+    else {
+        const lastChar = val.slice(-1);
+        const isOp = (c) => ['+','−','×','÷','%'].includes(c);
+        if (isOp(key) && isOp(lastChar)) {
+            val = val.slice(0, -1) + key;
+        } else {
+            val += key;
+        }
+    }
+    input.value = val;
+};
+
 function buildContactDetail(id) {
   const c = window.contacts.find(x=>x.id===id);
   if (!c) { window._openContactId = null; return buildContacts(); }
@@ -874,7 +967,7 @@ function buildContactDetail(id) {
       <div class="flex-1">
         <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('amount_label')}</label>
         <div class="relative"><span class="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">৳</span>
-        <input id="entryAmount" type="number" placeholder="0.00" class="w-full pl-10 pr-4 py-3 rounded-2xl glass-input dyn-focus text-base font-semibold outline-none mono"></div>
+        <input id="entryAmount" inputmode="none" type="text" placeholder="0.00" class="w-full pl-10 pr-4 py-3 rounded-2xl glass-input dyn-focus text-base font-semibold outline-none mono" onfocus="window.openCalc()" onclick="window.openCalc()"></div>
       </div>
       <div class="w-[60px] shrink-0 flex flex-col items-center">
         <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block text-center w-full">${window.lang==='bn'?'তারিখ':'DATE'}</label>
@@ -905,6 +998,41 @@ function buildContactDetail(id) {
         </div>
       </div>`).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">${_t('no_entries')}</div>`}
     </div>
+  </div>
+  
+  <div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-100 dark:bg-[#1B1638] border-t border-slate-200 dark:border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] z-[200] transform translate-y-full transition-transform duration-300 pb-safe pb-4">
+      <div class="flex justify-between items-center px-4 py-2 bg-slate-200 dark:bg-white/5 border-b border-slate-300 dark:border-white/5">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Calculator</span>
+          <button type="button" onclick="window.closeCalc()" class="p-2 text-slate-500 hover:text-oxblood font-bold transition-colors"><i data-lucide="chevron-down" class="w-5 h-5"></i></button>
+      </div>
+      <div class="grid grid-cols-4 gap-2 p-3">
+          <button type="button" onclick="window.calcPress('AC')" class="calc-btn text-oxblood bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">AC</button>
+          <button type="button" onclick="window.calcPress('%')" class="calc-btn text-steel bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">%</button>
+          <button type="button" onclick="window.calcPress('÷')" class="calc-btn text-steel bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">÷</button>
+          <button type="button" onclick="window.calcPress('×')" class="calc-btn text-steel bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">×</button>
+
+          <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">7</button>
+          <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">8</button>
+          <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">9</button>
+          <button type="button" onclick="window.calcPress('−')" class="calc-btn text-brass text-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">−</button>
+
+          <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">4</button>
+          <button type="button" onclick="window.calcPress('5')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">5</button>
+          <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">6</button>
+          <button type="button" onclick="window.calcPress('+')" class="calc-btn text-brass text-2xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 shadow-sm">+</button>
+
+          <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">1</button>
+          <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">2</button>
+          <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">3</button>
+          <button type="button" onclick="window.calcPress('=')" class="calc-btn bg-brass text-[#120E29] row-span-2 text-3xl shadow-md">=</button>
+
+          <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white dark:bg-white/5 shadow-sm"><i data-lucide="delete" class="w-6 h-6 mx-auto"></i></button>
+          <button type="button" onclick="window.calcPress('0')" class="calc-btn text-slate-800 dark:text-white bg-white dark:bg-white/5 shadow-sm">0</button>
+          <button type="button" onclick="window.calcPress('.')" class="calc-btn text-slate-800 dark:text-white text-2xl bg-white dark:bg-white/5 shadow-sm">.</button>
+      </div>
+      <div class="px-3 pt-2">
+         <button type="button" onclick="window.closeCalc(); window.submitEntry('${c.id}')" class="w-full py-3.5 rounded-2xl bg-brass text-[#120E29] font-bold shadow-lg flex items-center justify-center gap-2 text-[15px] active:scale-[0.98] transition-transform"><i data-lucide="check-circle" class="w-5 h-5"></i> এন্ট্রি করুন (Save)</button>
+      </div>
   </div>`;
 }
 window.setEntryType = (type) => {
@@ -921,11 +1049,19 @@ window.setEntryType = (type) => {
 };
 
 window.submitEntry = async (contactId) => {
+  window.closeCalc();
   const btn = document.getElementById('entrySaveBtn'); if(!btn) return;
   const og = btn.innerHTML; btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>'; btn.disabled = true; lucide.createIcons();
   try {
-    const amount = Number(document.getElementById('entryAmount').value);
+    let rawAmount = document.getElementById('entryAmount').value || "";
+    let amount = 0;
+    try {
+        let res = eval(rawAmount.replace(/÷/g, '/').replace(/×/g, '*').replace(/−/g, '-'));
+        amount = Number(Number(res).toFixed(2));
+    } catch(e) { amount = 0; }
+    
     if (!amount || amount <= 0) throw new Error(_t('req_entry_fields'));
+    
     const row = { user_id: window.session.user.id, contact_id: contactId, type: window._entryType, amount, note: document.getElementById('entryNote').value || null, entry_date: document.getElementById('entryDate').value, ref_id: refId() };
     const { data, error } = await window.supa.from('entries').insert([row]).select();
     if (error) throw error;
@@ -936,7 +1072,7 @@ window.submitEntry = async (contactId) => {
     ['entryAmount','entryNote'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     window.renderContent();
   } catch(e) { window.showToast(translateErr(e.message), 'error'); }
-  finally { const freshBtn = document.getElementById('entrySaveBtn'); if (freshBtn) { freshBtn.disabled = false; lucide.createIcons(); } }
+  finally { const freshBtn = document.getElementById('entrySaveBtn'); if (freshBtn) { freshBtn.disabled = false; freshBtn.innerHTML = og; lucide.createIcons(); } }
 };
 
 window.deleteEntry = async (id) => {
@@ -1461,18 +1597,22 @@ window.openMyFeedback = async () => {
 
 // ================= ADMIN: MANAGE SCREEN =================
 window.loadManageUsers = async () => {
-  window._isManageLoading = true; window._manageError = null; window.render();
+  window._isManageLoading = true; window._manageError = null;
+  if (document.getElementById('mainContent')) window.renderContent(); else window.render();
   try { const json = await window.adminApi('list_users', {}); window._manageUsers = json.users || []; window._manageLoaded = true; }
   catch(e) { window._manageError = translateErr(e.message) || 'Failed to load users'; }
-  window._isManageLoading = false; window.render();
+  window._isManageLoading = false;
+  if (document.getElementById('mainContent')) window.renderContent(); else window.render();
 };
 window.loadManageFeedback = async () => {
-  window._isFeedbackLoading = true; window._feedbackError = null; window.render();
+  window._isFeedbackLoading = true; window._feedbackError = null;
+  if (document.getElementById('mainContent')) window.renderContent(); else window.render();
   try { const json = await window.adminApi('list_user_feedback', {}); window._manageFeedback = json.feedback || []; window._feedbackLoaded = true; }
   catch(e) { window._feedbackError = translateErr(e.message) || 'Failed to load feedback'; }
-  window._isFeedbackLoading = false; window.render();
+  window._isFeedbackLoading = false;
+  if (document.getElementById('mainContent')) window.renderContent(); else window.render();
 };
-window.switchManageView = (view) => { window._manageView = view; window.render(); };
+window.switchManageView = (view) => { window._manageView = view; window.renderContent(); };
 
 window.suspendUser = async (id) => {
   window.showModal(`
@@ -1537,7 +1677,7 @@ window.showFeedbackDetail = async (id) => {
         <button onclick="window.deleteFeedbackItem('${id}')" class="px-4 py-2.5 bg-oxblood/10 text-oxblood rounded-2xl font-bold text-[13px] active:scale-95 transition-transform">Delete</button>
       </div>
     </div>`);
-  window.render();
+  window.renderContent();
 };
 window.submitFeedbackReply = async (id) => {
   const text = document.getElementById('admin-reply-text').value.trim();
@@ -1547,7 +1687,7 @@ window.submitFeedbackReply = async (id) => {
     await window.adminApi('reply_user_feedback', { id, reply: text });
     const f = window._manageFeedback.find(x => x.id === id);
     if (f) { f.admin_reply = text; f.reply_at = new Date().toISOString(); f.reply_seen = false; f.is_read = true; }
-    window.hideModal(); window.showToast('Reply sent!'); window.render();
+    window.hideModal(); window.showToast('Reply sent!'); window.renderContent();
   } catch(e) { window.showToast(translateErr(e.message), 'error'); }
 };
 window.deleteFeedbackItem = (id) => {
@@ -1560,7 +1700,7 @@ window.deleteFeedbackItem = (id) => {
 };
 window.confirmDeleteFeedback = async (id) => {
   window.hideModal();
-  try { await window.adminApi('delete_user_feedback', { id }); window._manageFeedback = window._manageFeedback.filter(f => f.id !== id); window.showToast('Deleted'); window.render(); }
+  try { await window.adminApi('delete_user_feedback', { id }); window._manageFeedback = window._manageFeedback.filter(f => f.id !== id); window.showToast('Deleted'); window.renderContent(); }
   catch(e) { window.showToast(translateErr(e.message), 'error'); }
 };
 window.deleteAllFeedback = () => {
@@ -1573,13 +1713,13 @@ window.deleteAllFeedback = () => {
 };
 window.confirmDeleteAllFeedback = async () => {
   window.hideModal();
-  try { await window.adminApi('delete_all_user_feedback', {}); window._manageFeedback = []; window.showToast('All feedback deleted'); window.render(); }
+  try { await window.adminApi('delete_all_user_feedback', {}); window._manageFeedback = []; window.showToast('All feedback deleted'); window.renderContent(); }
   catch(e) { window.showToast(translateErr(e.message), 'error'); }
 };
-window.markFeedbackRead = async (id, e) => { if (e) e.stopPropagation(); try { await window.adminApi('mark_feedback_read', { id }); const f = window._manageFeedback.find(x=>x.id===id); if(f) f.is_read = true; window.render(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
-window.markFeedbackUnread = async (id, e) => { if (e) e.stopPropagation(); try { await window.adminApi('mark_feedback_unread', { id }); const f = window._manageFeedback.find(x=>x.id===id); if(f) f.is_read = false; window.render(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
-window.markAllFeedbackRead = async () => { try { await window.adminApi('mark_all_feedback_read', {}); window._manageFeedback.forEach(f=>f.is_read=true); window.showToast('All marked as read'); window.render(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
-window.markAllFeedbackUnread = async () => { try { await window.adminApi('mark_all_feedback_unread', {}); window._manageFeedback.forEach(f=>f.is_read=false); window.showToast('All marked as unread'); window.render(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
+window.markFeedbackRead = async (id, e) => { if (e) e.stopPropagation(); try { await window.adminApi('mark_feedback_read', { id }); const f = window._manageFeedback.find(x=>x.id===id); if(f) f.is_read = true; window.renderContent(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
+window.markFeedbackUnread = async (id, e) => { if (e) e.stopPropagation(); try { await window.adminApi('mark_feedback_unread', { id }); const f = window._manageFeedback.find(x=>x.id===id); if(f) f.is_read = false; window.renderContent(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
+window.markAllFeedbackRead = async () => { try { await window.adminApi('mark_all_feedback_read', {}); window._manageFeedback.forEach(f=>f.is_read=true); window.showToast('All marked as read'); window.renderContent(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
+window.markAllFeedbackUnread = async () => { try { await window.adminApi('mark_all_feedback_unread', {}); window._manageFeedback.forEach(f=>f.is_read=false); window.showToast('All marked as unread'); window.renderContent(); } catch(err) { window.showToast(translateErr(err.message), 'error'); } };
 
 function buildManage(){
   const isUsersView = window._manageView !== 'feedback';
