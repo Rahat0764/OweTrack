@@ -11,8 +11,13 @@ module.exports = async (req, res) => {
 
   try {
     if (action === 'status') {
-      const { data } = await sb.from('profiles').select('pin_set, is_suspended').eq('id', user.id).single();
-      return res.status(200).json({ pin_set: !!(data && data.pin_set), is_suspended: !!(data && data.is_suspended) });
+      // Fetch suspend_reason as well
+      const { data } = await sb.from('profiles').select('pin_set, is_suspended, suspend_reason').eq('id', user.id).single();
+      return res.status(200).json({ 
+        pin_set: !!(data && data.pin_set), 
+        is_suspended: !!(data && data.is_suspended),
+        suspend_reason: data?.suspend_reason || null
+      });
     }
 
     // 1. SET: only for brand new accounts (first-time PIN)
