@@ -781,7 +781,7 @@ window.closeCalc = () => {
     const main = document.getElementById('mainContentScroll') || document.querySelector('main');
     if(calc) {
         calc.classList.add('translate-y-full');
-        if(main) main.style.paddingBottom = '0px';
+        if(main) main.style.paddingBottom = '';
         setTimeout(() => { calc.style.visibility = 'hidden'; }, 300);
     }
 };
