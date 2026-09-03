@@ -615,12 +615,18 @@ window.openMasterKeyModal = () => {
     try {
       const masterKey = document.getElementById('masterKeyInput').value; window.showToast('Verifying...', 'info');
       const json = await window.callApi('/api/master-verify', { masterKey, accessToken: window.session.access_token });
-      window.adminToken = json.token; localStorage.setItem('ledger_admin_token', json.token); window.hideModal(); window.changeTab('manage');
+      window.adminToken = json.token; localStorage.setItem('ledger_admin_token', json.token); window.hideModal();
+      window._openContactId = null; window.activeTab = 'manage'; localStorage.setItem('ledger_tab', 'manage');
+      window.render();
       window.loadManageFeedback();
     } catch(e){ window.showToast(translateErr(e.message), 'error'); }
   };
 };
-window.exitAdmin = () => { window.adminToken = null; localStorage.removeItem('ledger_admin_token'); window.changeTab('dashboard'); };
+window.exitAdmin = () => {
+  window.adminToken = null; localStorage.removeItem('ledger_admin_token');
+  window._openContactId = null; window.activeTab = 'dashboard'; localStorage.setItem('ledger_tab', 'dashboard');
+  window.render();
+};
 
 function buildShell(innerHtml) {
   const p = window.profile || {}; const isSuper = window.adminToken;
