@@ -94,14 +94,16 @@ tailwind.config = {
   }
   .calc-btn:active { transform: scale(0.92); filter: brightness(0.9); }
   .dark .calc-btn:active { filter: brightness(1.2); }
-
-  /* Note box grid-height animation */
   .note-grid { display:grid; grid-template-rows:0fr; opacity:0; transition: grid-template-rows .32s cubic-bezier(.16,1,.3,1), opacity .28s ease; }
   .note-grid.open { grid-template-rows:1fr; opacity:1; }
   .note-grid > div { overflow:hidden; }
 </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100 flex flex-col h-full w-full relative">
+
+<div id="ptr-indicator" class="fixed top-0 inset-x-0 mx-auto w-10 h-10 bg-white dark:bg-slate-800 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.15)] flex items-center justify-center z-[9999] transition-transform duration-300 pointer-events-none" style="transform: translateY(-150%);">
+  <i data-lucide="refresh-cw" id="ptr-icon" class="w-5 h-5 text-brass"></i>
+</div>
 
 <div id="boot" class="fixed inset-0 bg-[#F3F0FF] dark:bg-[#120E29] z-[999] flex flex-col items-center justify-center gap-6 p-4">
   <div class="w-24 h-24 rounded-3xl bg-gradient-to-br from-steel to-brass flex items-center justify-center shadow-[0_0_40px_rgba(45,217,192,0.3)] animate-pulse border-4 border-white dark:border-[#1B1638]">
@@ -145,7 +147,6 @@ tailwind.config = {
   </div>
 </div>
 
-<!-- Horizontal Full-width Bottom Keyboard -->
 <div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 w-full z-[9999] flex flex-col glass dark:bg-[#1B1638]/95 backdrop-blur-3xl rounded-t-3xl border-t border-slate-200 dark:border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.4)] transition-transform duration-300 translate-y-full pb-safe" style="visibility: hidden;">
     <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-1 cursor-pointer hover:bg-slate-400 transition-colors" onclick="window.closeCalc()"></div>
     <div class="grid grid-cols-4 gap-1.5 p-3 pt-1">
@@ -293,7 +294,6 @@ window.togglePw = (id) => {
   lucide.createIcons();
 };
 
-// ================= STATE =================
 window.supa = null; window.session = null; window.profile = null;
 window.activeTab = localStorage.getItem('ledger_tab') || 'dashboard';
 window.contacts = []; window.entries = []; window.CFG = {};
@@ -315,7 +315,6 @@ window._feedbackRating = 0;
 window._myFeedback = []; window._myFeedbackUnreadCount = 0;
 window._feedbackOpen = false; window._fabDocked = false;
 
-// Handle clicking outside calculator to close
 document.addEventListener('click', (e) => {
     const calc = document.getElementById('calc-keyboard');
     const amtInput = document.getElementById('entryAmount');
@@ -342,7 +341,6 @@ function getDisplayEmail() {
   return window.session?.user?.email || window.profile?.email || '';
 }
 
-// ================= PIN PAD =================
 let pinResolve, pinReject, pinEntered = '';
 window.askPin = async (title, subtitle='', showForgot=false) => {
   if (window._pinModalOpen) throw new Error('cancelled');
@@ -515,7 +513,7 @@ window.loadData = async (silent = false) => {
   }
 };
 
-// ================= BALANCE HELPERS =================
+// Balance
 function contactStats(contactId) {
   const rows = window.entries.filter(e => e.contact_id === contactId);
   const gave = rows.filter(e=>e.type==='gave').reduce((s,e)=>s+Number(e.amount),0);
@@ -528,7 +526,7 @@ function overallStats() {
   return { get, pay, net: get - pay };
 }
 
-// ================= RENDER =================
+// Render
 window.render = () => {
   const root = document.getElementById('root');
   if (!window.session) { root.innerHTML = buildLanding(); lucide.createIcons(); return; }
@@ -768,7 +766,6 @@ window.openCalc = () => {
     const calc = document.getElementById('calc-keyboard');
     const main = document.getElementById('mainContentScroll') || document.querySelector('main');
     if(calc) {
-        // Remove old inline styles forcing it to center
         calc.style.top = ''; 
         calc.style.left = ''; 
         calc.style.transform = ''; 
@@ -827,7 +824,6 @@ window.calcPress = (key) => {
     input.value = val;
 };
 
-// Handle external keyboard keys
 window.handleCalcKeydown = (e) => {
     const allowedKeys = ['0','1','2','3','4','5','6','7','8','9','.','Backspace','Delete','Enter','=','+','-','*','/','%'];
     if (!allowedKeys.includes(e.key)) { 
@@ -844,7 +840,6 @@ window.handleCalcKeydown = (e) => {
     else window.calcPress(k);
 };
 
-// ================= NOTE BOX TOGGLE =================
 window.toggleNoteBox = () => {
   window._noteBoxOpen = !window._noteBoxOpen;
   const wrap = document.getElementById('noteBoxWrap');
@@ -886,7 +881,7 @@ function buildContactDetail(id) {
       <p class="text-[10px] text-slate-500">${c.phone || (window.lang==='bn'?'নাম্বার নেই':'No phone')}</p>
     </div>
     <button onclick="window.openContactModal('${c.id}')" class="p-2.5 rounded-2xl glass-input text-slate-500"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-    <button onclick="window.deleteContact('${c.id}')" class="p-2.5 rounded-2xl bg-oxblood/10 text-oxblood"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+    <button onclick="window.removePerson('${c.id}')" class="p-2.5 rounded-2xl bg-oxblood/10 text-oxblood active:scale-90 transition-transform"><i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i></button>
   </div>
 
   <div class="grid grid-cols-3 gap-2 mb-5">
@@ -969,8 +964,7 @@ function buildContactDetail(id) {
   </div>`;
 }
 
-// ================= DASHBOARD =================
-
+// Dashboard 
 function getAccountBar() {
   const p = window.profile || {};
   return `
@@ -1090,7 +1084,7 @@ window.showNoteInfo = (id) => {
     </div>`);
 };
 
-// ================= CONTACTS =================
+// Contacts
 function buildContacts() {
   const sorted = window.contacts.slice().sort((a,b)=> Math.abs(contactStats(b.id).net) - Math.abs(contactStats(a.id).net));
   return `
@@ -1200,7 +1194,7 @@ window.deleteEntry = async (id) => {
   } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
 };
 
-window.deleteContact = async (id) => {
+window.removePerson = async (id) => {
   try {
     const pin = await window.askPin(_t('del_confirm_1'), _t('enter_pin_cont'));
     window.showToast(_t('verifying'), 'info');
@@ -1216,7 +1210,6 @@ window.deleteContact = async (id) => {
   } catch(e) { if(e.message !== 'cancelled') window.showToast(translateErr(e.message), 'error'); }
 };
 
-// ================= HISTORY =================
 function buildHistory() {
   let list = window.entries.filter(e => window._historyFilter==='all' || e.type===window._historyFilter);
   if (window._historySearch) {
@@ -1250,7 +1243,7 @@ function buildHistory() {
   </div>`;
 }
 
-// ================= PROFILE =================
+// Profile
 function buildProfile() {
   const p = window.profile || {};
   const { gId, ghId } = getIdentities();
@@ -1391,7 +1384,6 @@ window.handleImportFile = (e) => {
 
       window.showToast('Importing...', 'info');
 
-      // Resolve or create contacts by name (case-insensitive)
       const nameToId = {};
       window.contacts.forEach(c => { nameToId[c.name.toLowerCase().trim()] = c.id; });
 
@@ -1501,7 +1493,6 @@ window.reqDeleteAccount = async () => {
   finally { window._pinFlowActive = false; }
 };
 
-// ================= AVATAR CROPPER (simple pointer-based) =================
 let cropState = { img: null, scale: 1, dx: 0, dy: 0, dragging: false, px: 0, py: 0, pointers: [], initDist: 0, initScale: 1 };
 window.initCropper = (e) => {
   const file = e.target.files[0]; e.target.value = '';
@@ -1590,7 +1581,7 @@ window.doCrop = () => {
   }, 'image/jpeg', 0.9);
 };
 
-// ================= FEEDBACK FAB =================
+// Feedback
 function buildFeedbackFab(){
   return `
   <div id="feedbackFabWrap" class="md:hidden fixed z-40 flex flex-col items-end" style="right:20px; bottom:96px;">
@@ -1707,7 +1698,7 @@ window.openMyFeedback = async () => {
   }
 };
 
-// ================= ADMIN: MANAGE SCREEN =================
+// Manage
 window.loadManageUsers = async () => {
   window._isManageLoading = true; window._manageError = null;
   if (document.getElementById('mainContent')) window.renderContent(); else window.render();
@@ -1923,6 +1914,65 @@ function hideBoot() {
   const bootEl = document.getElementById('boot');
   if (bootEl && !bootEl.classList.contains('boot-hide')) { bootEl.classList.add('boot-hide'); setTimeout(()=>bootEl.remove(), 400); }
 }
+
+// Refresh
+let ptrStartY = 0;
+let isRefreshing = false;
+const PTR_THRESHOLD = 70;
+
+document.addEventListener('touchstart', e => {
+  if (isRefreshing) return;
+  const scrollEl = document.getElementById('mainContentScroll');
+  if (!scrollEl || scrollEl.scrollTop <= 0) {
+    ptrStartY = e.touches[0].clientY;
+  } else {
+    ptrStartY = 0;
+  }
+}, {passive: true});
+
+document.addEventListener('touchmove', e => {
+  if (!ptrStartY || isRefreshing) return;
+  const y = e.touches[0].clientY;
+  const dy = y - ptrStartY;
+  
+  if (dy > 0) {
+    const indicator = document.getElementById('ptr-indicator');
+    if(indicator) {
+      indicator.style.transition = 'none';
+      const moveY = Math.min(dy * 0.4, PTR_THRESHOLD);
+      indicator.style.transform = `translateY(${moveY - 50}px)`;
+      const icon = document.getElementById('ptr-icon');
+      if(icon) icon.style.transform = `rotate(${dy}deg)`;
+    }
+  }
+}, {passive: true});
+
+document.addEventListener('touchend', e => {
+  if (!ptrStartY || isRefreshing) return;
+  const y = e.changedTouches[0].clientY;
+  const dy = y - ptrStartY;
+  const indicator = document.getElementById('ptr-indicator');
+  
+  if (dy * 0.4 >= PTR_THRESHOLD - 15) {
+    isRefreshing = true;
+    if(indicator) {
+      indicator.style.transition = 'transform 0.3s ease';
+      indicator.style.transform = 'translateY(16px)';
+      const icon = document.getElementById('ptr-icon');
+      if(icon) {
+        icon.style.transform = '';
+        icon.classList.add('animate-spin');
+      }
+    }
+    setTimeout(() => window.location.reload(), 400);
+  } else {
+    if(indicator) {
+      indicator.style.transition = 'transform 0.3s ease';
+      indicator.style.transform = 'translateY(-150%)';
+    }
+  }
+  ptrStartY = 0;
+});
 
 async function boot() {
   const bootRetryBtn = document.getElementById('bootRetryBtn');
