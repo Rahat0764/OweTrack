@@ -94,6 +94,11 @@ tailwind.config = {
   }
   .calc-btn:active { transform: scale(0.92); filter: brightness(0.9); }
   .dark .calc-btn:active { filter: brightness(1.2); }
+
+  /* Note box grid-height animation */
+  .note-grid { display:grid; grid-template-rows:0fr; opacity:0; transition: grid-template-rows .32s cubic-bezier(.16,1,.3,1), opacity .28s ease; }
+  .note-grid.open { grid-template-rows:1fr; opacity:1; }
+  .note-grid > div { overflow:hidden; }
 </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100 flex flex-col h-full w-full relative">
@@ -182,7 +187,7 @@ const LANG = {
     recent: "সাম্প্রতিক লেনদেন", see_all: "সব দেখুন", no_entries: "এখনো কোনো এন্ট্রি নেই।",
     add_contact: "নতুন মানুষ যোগ করুন", contact_name: "নাম", contact_phone: "মোবাইল নাম্বার (ঐচ্ছিক)",
     pick_contact: "কন্টাক্ট থেকে বাছাই করুন", save: "সেভ করুন", owes_you: "আপনাকে দিবে", you_owe: "আপনি দিবেন", settled: "হিসাব ক্লিয়ার",
-    gave: "দিলাম", took: "নিলাম", amount_label: "পরিমাণ (৳)", note_label: "নোট / কারণ (ঐচ্ছিক)", date_label: "তারিখ", save_entry: "এন্ট্রি সেভ করুন",
+    gave: "দিলাম", took: "নিলাম", amount_label: "পরিমাণ (৳)", note_label: "নোট (ঐচ্ছিক)", reason_label: "রিজন / কারণ (ঐচ্ছিক)", add_note: "নোট যোগ করুন", date_label: "তারিখ", save_entry: "এন্ট্রি সেভ করুন",
     entry_history: "লেনদেনের হিস্ট্রি", del: "মুছুন", edit_contact: "এডিট করুন", delete_contact: "মানুষ মুছে ফেলুন",
     all: "সব", search: "খুঁজুন...", sort_date: "তারিখ অনুযায়ী", sort_entry: "এন্ট্রি অনুযায়ী",
     change_pin: "পিন পরিবর্তন করুন", danger: "বিপদজনক অঞ্চল", reset_all: "সম্পূর্ণ হিসাব রিসেট করুন",
@@ -204,7 +209,7 @@ const LANG = {
     recent: "Recent Entries", see_all: "See All", no_entries: "No entries yet.",
     add_contact: "Add New Person", contact_name: "Name", contact_phone: "Phone Number (Optional)",
     pick_contact: "Pick from Contacts", save: "Save", owes_you: "Owes you", you_owe: "You owe", settled: "Settled",
-    gave: "Gave", took: "Took", amount_label: "Amount (৳)", note_label: "Note / Reason (Optional)", date_label: "Date", save_entry: "Save Entry",
+    gave: "Gave", took: "Took", amount_label: "Amount (৳)", note_label: "Note (Optional)", reason_label: "Reason (Optional)", add_note: "Add Note", date_label: "Date", save_entry: "Save Entry",
     entry_history: "Entry History", del: "Delete", edit_contact: "Edit", delete_contact: "Delete Person",
     all: "All", search: "Search...", sort_date: "Sort: Date", sort_entry: "Sort: Entry",
     change_pin: "Change PIN", danger: "Danger Zone", reset_all: "Reset Full History",
@@ -300,6 +305,7 @@ window._isDataLoading = false;
 window._openContactId = null;
 window._historySearch = ''; window._historyFilter = 'all'; window._historySort = 'date';
 window._entryType = 'gave';
+window._noteBoxOpen = false;
 window.adminToken = localStorage.getItem('ledger_admin_token') || null;
 window.logoTapCount = 0;
 window._manageView = 'users';
@@ -700,11 +706,13 @@ window.changeTab = (tab) => { if (tab === 'manage' && !window.adminToken) return
   
 window.openContact = (id) => {
   window._openContactId = id;
+  window._noteBoxOpen = false;
   window.renderContent();
 };
 
 window.closeContact = () => {
   window._openContactId = null;
+  window._noteBoxOpen = false;
   window.renderContent();
 };
 
@@ -836,6 +844,30 @@ window.handleCalcKeydown = (e) => {
     else window.calcPress(k);
 };
 
+// ================= NOTE BOX TOGGLE =================
+window.toggleNoteBox = () => {
+  window._noteBoxOpen = !window._noteBoxOpen;
+  const wrap = document.getElementById('noteBoxWrap');
+  const toggleBtn = document.getElementById('noteToggleBtn');
+  if (!wrap) return;
+  if (window._noteBoxOpen) {
+    if (toggleBtn) toggleBtn.style.display = 'none';
+    wrap.classList.add('open');
+    setTimeout(() => { const ta = document.getElementById('entryNote'); if (ta) ta.focus(); }, 200);
+  } else {
+    const ta = document.getElementById('entryNote'); if (ta) ta.value = '';
+    wrap.classList.remove('open');
+    if (toggleBtn) toggleBtn.style.display = '';
+  }
+};
+window.closeNoteBoxSilent = () => {
+  window._noteBoxOpen = false;
+  const wrap = document.getElementById('noteBoxWrap');
+  const toggleBtn = document.getElementById('noteToggleBtn');
+  if (wrap) wrap.classList.remove('open');
+  if (toggleBtn) toggleBtn.style.display = '';
+};
+
 function buildContactDetail(id) {
   const c = window.contacts.find(x=>x.id===id);
   if (!c) { window._openContactId = null; return buildContacts(); }
@@ -883,8 +915,24 @@ function buildContactDetail(id) {
         </div>
       </div>
     </div>
-    <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('note_label')}</label>
-    <input id="entryNote" type="text" placeholder="..." class="w-full px-4 py-3 rounded-2xl glass-input dyn-focus text-[13px] font-medium outline-none mb-4">
+    <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('reason_label')}</label>
+    <div class="flex items-center gap-2 mb-1">
+      <input id="entryReason" type="text" placeholder="${window.lang==='bn'?'যেমনঃ বাজার খরচ':'e.g. Lunch money'}" class="flex-1 min-w-0 px-4 py-3 rounded-2xl glass-input dyn-focus text-[13px] font-medium outline-none">
+      <button type="button" id="noteToggleBtn" onclick="window.toggleNoteBox()" title="${_t('add_note')}" class="shrink-0 w-[46px] h-[46px] rounded-2xl glass-input flex items-center justify-center text-slate-500 hover:text-brass active:scale-90 transition-all">
+        <i data-lucide="sticky-note" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <div id="noteBoxWrap" class="note-grid${window._noteBoxOpen?' open':''}">
+      <div>
+        <div class="flex items-center gap-2 pt-3 mb-1">
+          <textarea id="entryNote" placeholder="${_t('note_label')}" class="flex-1 min-w-0 px-4 py-3 rounded-2xl glass-input dyn-focus text-[13px] font-medium outline-none min-h-[54px] resize-none"></textarea>
+          <button type="button" onclick="window.toggleNoteBox()" title="${_t('del')}" class="shrink-0 w-[46px] h-[46px] rounded-2xl bg-oxblood/10 text-oxblood flex items-center justify-center active:scale-90 transition-all">
+            <i data-lucide="trash-2" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="mb-3"></div>
     <button type="button" id="entrySaveBtn" onclick="window.submitEntry('${c.id}')" class="w-full py-3.5 rounded-2xl ${isGave?'bg-brass text-[#120E29]':'bg-oxblood text-white'} font-bold shadow-lg active:scale-[0.98] transition-all disp tracking-wide text-[15px] flex items-center justify-center gap-2"><i data-lucide="check" class="w-5 h-5"></i> ${_t('save_entry')}</button>
   </div>
 
@@ -894,7 +942,7 @@ function buildContactDetail(id) {
       ${rows.map(e => `<div class="p-4 flex items-center gap-3 hover:bg-white/40 dark:hover:bg-white/5 transition-colors">
         <div class="w-10 h-10 rounded-2xl ${e.type==='gave'?'bg-brass/15 text-brass':'bg-oxblood/15 text-oxblood'} flex items-center justify-center shrink-0"><i data-lucide="${e.type==='gave'?'arrow-down-left':'arrow-up-right'}" class="w-4 h-4"></i></div>
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5"><p class="text-[13px] font-semibold truncate">${e.type==='gave'?_t('gave'):_t('took')}</p>${e.note?`<i data-lucide="info" onclick="window.showNoteInfo('${e.id}')" class="w-3.5 h-3.5 text-steel cursor-pointer shrink-0"></i>`:''}</div>
+          <div class="flex items-center gap-1.5"><p class="text-[13px] font-semibold truncate">${e.reason ? e.reason : (e.type==='gave'?_t('gave'):_t('took'))}</p>${e.note?`<i data-lucide="info" onclick="window.showNoteInfo('${e.id}')" class="w-3.5 h-3.5 text-steel cursor-pointer shrink-0"></i>`:''}</div>
           <p class="text-[10px] text-slate-500 font-medium mono mt-0.5">#${e.ref_id||''} &bull; ${formatDate(new Date(e.entry_date))}</p>
         </div>
         <div class="text-right shrink-0">
@@ -1006,7 +1054,7 @@ function entryRow(e) {
         <p class="text-[13px] font-bold truncate">${c ? c.name : 'Unknown'}</p>
         ${e.note ? `<i data-lucide="info" onclick="event.stopPropagation();window.showNoteInfo('${e.id}')" class="w-3.5 h-3.5 text-steel hover:text-brass cursor-pointer shrink-0"></i>` : ''}
       </div>
-      <p class="text-[10px] text-slate-500 font-medium mono mt-0.5">${isGave?_t('gave'):_t('took')} &bull; ${formatDate(d)}</p>
+      <p class="text-[10px] text-slate-500 font-medium mono mt-0.5">${e.reason ? e.reason : (isGave?_t('gave'):_t('took'))} &bull; ${formatDate(d)}</p>
     </div>
     <span class="font-bold mono tracking-tight text-sm ${isGave?'text-brass':'text-oxblood'}">${isGave?'+':'−'}৳ ${bnNum(e.amount)}</span>
   </div>`;
@@ -1019,6 +1067,7 @@ window.showNoteInfo = (id) => {
     <div class="relative text-left p-2">
       <button onclick="window.hideModal()" class="absolute -top-4 -right-4 p-2 text-slate-400 hover:text-rose-500 transition-colors rounded-full bg-slate-100 dark:bg-white/5"><i data-lucide="x" class="w-4 h-4"></i></button>
       <div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${window.lang==='bn'?'সাথে':'With'}</p><p class="text-[15px] font-semibold text-slate-800 dark:text-white">${c?c.name:'Unknown'}</p></div>
+      ${e.reason ? `<div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${_t('reason_label')}</p><p class="text-[14px] font-semibold text-slate-800 dark:text-white">${e.reason}</p></div>` : ''}
       <div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${_t('note_label')}</p>
         <div class="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl border border-slate-200 dark:border-white/10"><p class="text-[13px] text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap leading-relaxed">${e.note||'-'}</p></div>
       </div>
@@ -1079,41 +1128,6 @@ window.openContactModal = (id) => {
     </div>`);
 };
 
-window.pickDeviceContact = async () => {
-  try {
-    const props = ['name', 'tel'];
-    const contacts = await navigator.contacts.select(props, { multiple: false });
-    if (contacts && contacts.length) {
-      const c = contacts[0];
-      const nameEl = document.getElementById('modal-c-name');
-      const phoneEl = document.getElementById('modal-c-phone');
-      if (nameEl && c.name && c.name[0]) nameEl.value = c.name[0];
-      if (phoneEl && c.tel && c.tel[0]) phoneEl.value = c.tel[0];
-    }
-  } catch(e) { window.showToast('Contact picker not available', 'error'); }
-};
-
-window.saveContact = async (id) => {
-  const name = document.getElementById('modal-c-name').value.trim();
-  const phone = document.getElementById('modal-c-phone').value.trim();
-  if (!name) return window.showToast(_t('req_fields'), 'error');
-  window.showToast(_t('updating'), 'info');
-  try {
-    if (id) {
-      const { error } = await window.supa.from('contacts').update({ name, phone: phone || null }).eq('id', id);
-      if (error) throw error;
-      const c = window.contacts.find(x=>x.id===id); if (c) { c.name = name; c.phone = phone; }
-    } else {
-      const row = { user_id: window.session.user.id, name, phone: phone || null };
-      const { data, error } = await window.supa.from('contacts').insert([row]).select();
-      if (error) throw error;
-      if (data && data[0]) window.contacts.unshift(data[0]);
-      window.notify('contact_add', { contact_name: name });
-    }
-    window.hideModal(); window.showToast(_t('save_success')); window.renderContent();
-  } catch(e) { window.showToast(translateErr(e.message), 'error'); }
-};
-
 window.setEntryType = (type) => {
   window._entryType = type;
   const isGave = type === 'gave';
@@ -1141,14 +1155,17 @@ window.submitEntry = async (contactId) => {
     
     if (!amount || amount <= 0) throw new Error(_t('req_entry_fields'));
     
-    const row = { user_id: window.session.user.id, contact_id: contactId, type: window._entryType, amount, note: document.getElementById('entryNote').value || null, entry_date: document.getElementById('entryDate').value, ref_id: refId() };
+    const reasonEl = document.getElementById('entryReason');
+    const noteEl = document.getElementById('entryNote');
+    const row = { user_id: window.session.user.id, contact_id: contactId, type: window._entryType, amount, reason: (reasonEl && reasonEl.value.trim()) || null, note: (noteEl && noteEl.value.trim()) || null, entry_date: document.getElementById('entryDate').value, ref_id: refId() };
     const { data, error } = await window.supa.from('entries').insert([row]).select();
     if (error) throw error;
     if (data && data[0]) window.entries.unshift(data[0]);
     const c = window.contacts.find(x=>x.id===contactId);
     window.notify('entry_add', { type: row.type, amount: row.amount, contact_name: c?.name || '', ref_id: row.ref_id });
     window.showToast(_t('save_success'));
-    ['entryAmount','entryNote'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['entryAmount','entryReason','entryNote'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    window.closeNoteBoxSilent();
     window.renderContent();
   } catch(e) { window.showToast(translateErr(e.message), 'error'); }
   finally { const freshBtn = document.getElementById('entrySaveBtn'); if (freshBtn) { freshBtn.disabled = false; freshBtn.innerHTML = og; lucide.createIcons(); } }
@@ -1191,7 +1208,7 @@ function buildHistory() {
     const q = window._historySearch.toLowerCase();
     list = list.filter(e => {
       const c = window.contacts.find(x=>x.id===e.contact_id);
-      return ((c?.name||'')+' '+(e.ref_id||'')+' '+(e.note||'')).toLowerCase().includes(q);
+      return ((c?.name||'')+' '+(e.ref_id||'')+' '+(e.note||'')+' '+(e.reason||'')).toLowerCase().includes(q);
     });
   }
   list = list.slice();
@@ -1323,10 +1340,10 @@ window.unlinkProvider = async (provider) => {
 window.exportData = async () => {
   try {
     if (!window.entries.length) { window.showToast('No data to export', 'error'); return; }
-    const headers = ['contact_name','type','amount','note','entry_date','ref_id'];
+    const headers = ['contact_name','type','amount','reason','note','entry_date','ref_id'];
     const rows = window.entries.map(e => {
       const c = window.contacts.find(x=>x.id===e.contact_id);
-      const vals = [c?c.name:'', e.type, e.amount, e.note||'', e.entry_date, e.ref_id||''];
+      const vals = [c?c.name:'', e.type, e.amount, e.reason||'', e.note||'', e.entry_date, e.ref_id||''];
       return vals.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
     });
     const csv = [headers.join(','), ...rows].join('\n');
@@ -1376,6 +1393,7 @@ window.handleImportFile = (e) => {
           contact_id: nameToId[r.contact_name.trim().toLowerCase()],
           type: r.type,
           amount: Number(r.amount),
+          reason: r.reason || null,
           note: r.note || null,
           entry_date: r.entry_date || getLocalDateString(),
           ref_id: (r.ref_id && r.ref_id.trim()) || refId()
