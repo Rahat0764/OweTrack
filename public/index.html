@@ -97,6 +97,44 @@ tailwind.config = {
   .note-grid { display:grid; grid-template-rows:0fr; opacity:0; transition: grid-template-rows .32s cubic-bezier(.16,1,.3,1), opacity .28s ease; }
   .note-grid.open { grid-template-rows:1fr; opacity:1; }
   .note-grid > div { overflow:hidden; }
+
+  .stmt-box-gave { background-color: #dcfce7; border: 2px solid #22c55e; color: #14532d; }
+  .stmt-box-took { background-color: #fee2e2; border: 2px solid #ef4444; color: #7f1d1d; }
+  .stmt-box-empty { background-color: #f8fafc; border: 1.5px dashed #cbd5e1; }
+  .stmt-row { break-inside: avoid; page-break-inside: avoid; }
+
+  @media print {
+    @page { margin: 12mm; size: A4 portrait; }
+    html, body { background: #ffffff !important; color: #0f172a !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
+    body > *:not(#statementOverlay) { display: none !important; }
+    #statementOverlay {
+      position: static !important;
+      inset: auto !important;
+      display: block !important;
+      background: #ffffff !important;
+      overflow: visible !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100% !important;
+      height: auto !important;
+      z-index: auto !important;
+    }
+    #statementOverlay .no-print { display: none !important; }
+    #statementSheet {
+      box-shadow: none !important;
+      border: none !important;
+      border-radius: 0 !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .stmt-box-gave, .stmt-box-took, .stmt-box-empty, .stmt-summary-card, .stmt-col-head, .stmt-period-bar {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    .stmt-row { break-inside: avoid !important; page-break-inside: avoid !important; }
+  }
 </style>
 </head>
 <body class="text-slate-900 dark:text-slate-100 flex flex-col h-full w-full relative">
@@ -147,6 +185,8 @@ tailwind.config = {
   </div>
 </div>
 
+<div id="statementOverlay" class="fixed inset-0 bg-slate-900/80 dark:bg-black/90 z-[250] hidden flex-col overflow-y-auto backdrop-blur-md"></div>
+
 <div id="calc-keyboard" class="fixed bottom-0 left-0 right-0 w-full z-[9999] flex flex-col glass dark:bg-[#1B1638]/95 backdrop-blur-3xl rounded-t-3xl border-t border-slate-200 dark:border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.4)] transition-transform duration-300 translate-y-full pb-safe" style="visibility: hidden;">
     <div class="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full mx-auto mt-3 mb-1 cursor-pointer hover:bg-slate-400 transition-colors" onclick="window.closeCalc()"></div>
     <div class="grid grid-cols-4 gap-1.5 p-3 pt-1">
@@ -155,9 +195,9 @@ tailwind.config = {
         <button type="button" onclick="window.calcPress('÷')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">÷</button>
         <button type="button" onclick="window.calcPress('×')" class="calc-btn text-steel bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm text-2xl">×</button>
 
-        <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">7</button>
-        <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">8</button>
-        <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">9</button>
+        <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">1</button>
+        <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">2</button>
+        <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">3</button>
         <button type="button" onclick="window.calcPress('−')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">−</button>
 
         <button type="button" onclick="window.calcPress('4')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">4</button>
@@ -165,9 +205,9 @@ tailwind.config = {
         <button type="button" onclick="window.calcPress('6')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">6</button>
         <button type="button" onclick="window.calcPress('+')" class="calc-btn text-brass text-3xl bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/5 shadow-sm">+</button>
 
-        <button type="button" onclick="window.calcPress('1')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">1</button>
-        <button type="button" onclick="window.calcPress('2')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">2</button>
-        <button type="button" onclick="window.calcPress('3')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">3</button>
+        <button type="button" onclick="window.calcPress('7')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">7</button>
+        <button type="button" onclick="window.calcPress('8')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">8</button>
+        <button type="button" onclick="window.calcPress('9')" class="calc-btn text-slate-800 dark:text-white bg-white/80 dark:bg-white/10 shadow-sm text-xl">9</button>
         <button type="button" onclick="window.calcPress('=')" class="calc-btn bg-brass text-[#120E29] row-span-2 text-3xl shadow-md font-extrabold">=</button>
 
         <button type="button" onclick="window.calcPress('DEL')" class="calc-btn text-slate-500 bg-white/80 dark:bg-white/10 shadow-sm"><i data-lucide="delete" class="w-6 h-6 mx-auto"></i></button>
@@ -202,7 +242,9 @@ const LANG = {
     setup_security_pin: "সিকিউরিটি PIN সেট করুন", confirm_pin: "PIN নিশ্চিত করুন", confirm_pin_desc: "একই PIN আবার দিন", verify_identity: "খাতায় প্রবেশ করতে আপনার পরিচয় যাচাই করুন।", unlock_ledger: "Unlock Ledger",
     loading_data: "ডাটা লোড হচ্ছে...", logging_out: "Logging out securely...",
     forgot_pin_instruction: "Sign in again with the same account to reset your PIN.",
-    total_gave: "মোট দিলাম", total_took: "মোট নিলাম", no_history: "কোনো হিস্ট্রি নেই", export_data: "ডেটা এক্সপোর্ট (CSV)", import_data: "ডেটা ইমপোর্ট (CSV)"
+    total_gave: "মোট দিলাম", total_took: "মোট নিলাম", no_history: "কোনো হিস্ট্রি নেই", export_data: "ডেটা এক্সপোর্ট (CSV)", import_data: "ডেটা ইমপোর্ট (CSV)",
+    edit: "এডিট", edit_entry: "এন্ট্রি এডিট করুন", person_label: "ব্যক্তি / নাম", type_label: "ধরন", update_entry: "আপডেট করুন", entry_updated: "এন্ট্রি আপডেট হয়েছে!",
+    print_statement: "স্টেটমেন্ট প্রিন্ট", statement_title: "লেনদেন স্টেটমেন্ট", print_pdf: "প্রিন্ট / PDF সেভ", close: "বন্ধ করুন", edited: "এডিট করা", no_phone: "নাম্বার নেই", total_entries: "মোট এন্ট্রি"
   },
   en: {
     dashboard: "Home", contacts: "People", history: "History", profile: "Profile",
@@ -224,7 +266,9 @@ const LANG = {
     setup_security_pin: "Setup Security PIN", confirm_pin: "Confirm PIN", confirm_pin_desc: "Enter the same PIN again", verify_identity: "Please verify your identity to securely access your ledger.", unlock_ledger: "Unlock Ledger",
     loading_data: "Loading data...", logging_out: "Logging out securely...",
     forgot_pin_instruction: "Sign in again with the same account to reset your PIN.",
-    total_gave: "Total Gave", total_took: "Total Took", no_history: "No history yet", export_data: "Export Data (CSV)", import_data: "Import Data (CSV)"
+    total_gave: "Total Gave", total_took: "Total Took", no_history: "No history yet", export_data: "Export Data (CSV)", import_data: "Import Data (CSV)",
+    edit: "Edit", edit_entry: "Edit Entry", person_label: "Person / Name", type_label: "Type", update_entry: "Update Entry", entry_updated: "Entry updated!",
+    print_statement: "Print Statement", statement_title: "Transaction Statement", print_pdf: "Print / Save PDF", close: "Close", edited: "Edited", no_phone: "No phone", total_entries: "Total Entries"
   }
 };
 window._t = (key) => LANG[window.lang][key] || key;
@@ -261,9 +305,37 @@ const bnNum = (n) => {
 const BN_MONTHS = ['জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন','জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর'];
 const EN_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const formatDate = (dateObj) => {
+  if (!dateObj || isNaN(dateObj.getTime())) return '—';
   if (window.lang === 'en') return `${EN_MONTHS[dateObj.getMonth()]} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
   return `${BN_MONTHS[dateObj.getMonth()]} ${bnNum(dateObj.getDate())}, ${bnNum(dateObj.getFullYear())}`;
 };
+const parseLocalDate = (str) => {
+  if (!str) return new Date();
+  const s = String(str).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? new Date() : d;
+};
+const formatTime = (dateInput) => {
+  if (!dateInput) return '';
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  let hrs = d.getHours();
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hrs >= 12 ? 'PM' : 'AM';
+  hrs = hrs % 12 || 12;
+  const timeStr = `${hrs}:${mins} ${ampm}`;
+  return window.lang === 'bn' ? timeStr.replace(/\d/g, ch => '০১২৩৪৫৬৭৮৯'[ch]) : timeStr;
+};
+const formatDateTime = (dateObj) => `${formatDate(dateObj)}, ${formatTime(dateObj)}`;
+const escHtml = (str) => String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const sortEntriesDesc = (list) => list.slice().sort((a, b) => {
+  const da = parseLocalDate(a.entry_date).getTime();
+  const db = parseLocalDate(b.entry_date).getTime();
+  if (db !== da) return db - da;
+  return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+});
 const getLocalDateString = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const refId = () => Math.random().toString(36).substr(2,6).toUpperCase();
 const initials = (name) => (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
@@ -867,21 +939,24 @@ function buildContactDetail(id) {
   const c = window.contacts.find(x=>x.id===id);
   if (!c) { window._openContactId = null; return buildContacts(); }
   const { gave, took, net } = contactStats(id);
-  const rows = window.entries.filter(e=>e.contact_id===id);
+  const rows = sortEntriesDesc(window.entries.filter(e=>e.contact_id===id));
   const isGave = window._entryType === 'gave';
   const badge = net > 0 ? { txt: _t('owes_you'), tone:'brass' } : (net < 0 ? { txt: _t('you_owe'), tone:'oxblood' } : { txt: _t('settled'), tone:'steel' });
   const todayStr = getLocalDateString();
 
   return `
-  <div class="flex items-center gap-3 mb-4 mt-2">
-    <button onclick="window.closeContact()" class="p-2.5 rounded-2xl glass-input"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+  <div class="flex items-center gap-2.5 mb-3 mt-2">
+    <button onclick="window.closeContact()" class="p-2.5 rounded-2xl glass-input shrink-0"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
     <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-steel/25 to-brass/25 border border-white/30 dark:border-white/10 flex items-center justify-center shrink-0 font-bold text-sm disp">${initials(c.name)}</div>
     <div class="min-w-0 flex-1">
-      <h2 class="disp text-lg font-semibold truncate">${c.name}</h2>
-      <p class="text-[10px] text-slate-500">${c.phone || (window.lang==='bn'?'নাম্বার নেই':'No phone')}</p>
+      <h2 class="disp text-lg font-semibold truncate">${escHtml(c.name)}</h2>
+      <p class="text-[10px] text-slate-500">${escHtml(c.phone || _t('no_phone'))}</p>
     </div>
-    <button onclick="window.openContactModal('${c.id}')" class="p-2.5 rounded-2xl glass-input text-slate-500"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-    <button onclick="window.removePerson('${c.id}')" class="p-2.5 rounded-2xl bg-oxblood/10 text-oxblood active:scale-90 transition-transform"><i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i></button>
+    <button type="button" onclick="window.openStatement('${c.id}')" title="${_t('print_statement')}" class="px-3 py-2.5 rounded-2xl bg-brass/15 text-brass border border-brass/30 font-bold text-[11px] flex items-center gap-1.5 active:scale-95 transition-transform shrink-0">
+      <i data-lucide="printer" class="w-4 h-4"></i><span class="hidden sm:inline">${_t('print_statement')}</span>
+    </button>
+    <button onclick="window.openContactModal('${c.id}')" title="${_t('edit_contact')}" class="p-2.5 rounded-2xl glass-input text-slate-500 shrink-0"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+    <button onclick="window.removePerson('${c.id}')" title="${_t('delete_contact')}" class="p-2.5 rounded-2xl bg-oxblood/10 text-oxblood active:scale-90 transition-transform shrink-0"><i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i></button>
   </div>
 
   <div class="grid grid-cols-3 gap-2 mb-5">
@@ -946,18 +1021,24 @@ function buildContactDetail(id) {
     <button type="button" id="entrySaveBtn" onclick="window.submitEntry('${c.id}')" class="w-full py-3.5 rounded-2xl ${isGave?'bg-brass text-[#120E29]':'bg-oxblood text-white'} font-bold shadow-lg active:scale-[0.98] transition-all disp tracking-wide text-[15px] flex items-center justify-center gap-2"><i data-lucide="check" class="w-5 h-5"></i> ${_t('save_entry')}</button>
   </div>
 
-  <h3 class="disp text-base font-semibold mb-3">${_t('entry_history')}</h3>
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="disp text-base font-semibold">${_t('entry_history')}</h3>
+    <button type="button" onclick="window.openStatement('${c.id}')" class="sm:hidden px-3 py-1.5 rounded-xl bg-brass/15 text-brass border border-brass/25 text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition-transform"><i data-lucide="printer" class="w-3.5 h-3.5"></i> ${_t('print_statement')}</button>
+  </div>
   <div class="glass rounded-2xl overflow-hidden">
     <div class="divide-y divide-slate-900/[0.06] dark:divide-white/[0.06]">
       ${rows.map(e => `<div class="p-4 flex items-center gap-3 hover:bg-white/40 dark:hover:bg-white/5 transition-colors">
         <div class="w-10 h-10 rounded-2xl ${e.type==='gave'?'bg-brass/15 text-brass':'bg-oxblood/15 text-oxblood'} flex items-center justify-center shrink-0"><i data-lucide="${e.type==='gave'?'arrow-down-left':'arrow-up-right'}" class="w-4 h-4"></i></div>
         <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1.5"><p class="text-[13px] font-semibold truncate">${e.reason ? e.reason : (e.type==='gave'?_t('gave'):_t('took'))}</p>${e.note?`<i data-lucide="info" onclick="window.showNoteInfo('${e.id}')" class="w-3.5 h-3.5 text-steel cursor-pointer shrink-0"></i>`:''}</div>
-          <p class="text-[10px] text-slate-500 font-medium mono mt-0.5">#${e.ref_id||''} &bull; ${formatDate(new Date(e.entry_date))}</p>
+          <div class="flex items-center gap-1.5"><p class="text-[13px] font-semibold truncate">${e.reason ? escHtml(e.reason) : (e.type==='gave'?_t('gave'):_t('took'))}</p>${e.note?`<i data-lucide="info" onclick="window.showNoteInfo('${e.id}')" class="w-3.5 h-3.5 text-steel cursor-pointer shrink-0"></i>`:''}</div>
+          <p class="text-[10px] text-slate-500 font-medium mono mt-0.5">#${escHtml(e.ref_id||'')} &bull; ${formatDate(parseLocalDate(e.entry_date))}${e.created_at ? ' &bull; ' + formatTime(e.created_at) : ''}</p>
         </div>
         <div class="text-right shrink-0">
           <span class="font-semibold mono block tracking-tight text-sm ${e.type==='gave'?'text-brass':'text-oxblood'}">${e.type==='gave'?'+':'−'}৳ ${bnNum(e.amount)}</span>
-          <button type="button" onclick="window.deleteEntry('${e.id}')" class="text-[10px] text-slate-400 hover:text-oxblood font-bold mt-1.5 transition-colors">${_t('del')}</button>
+          <div class="flex items-center justify-end gap-2.5 mt-1.5">
+            <button type="button" onclick="window.openEditEntry('${e.id}')" class="text-[10px] text-steel hover:text-brass font-bold transition-colors flex items-center gap-0.5"><i data-lucide="pencil" class="w-3 h-3"></i>${_t('edit')}</button>
+            <button type="button" onclick="window.deleteEntry('${e.id}')" class="text-[10px] text-slate-400 hover:text-oxblood font-bold transition-colors">${_t('del')}</button>
+          </div>
         </div>
       </div>`).join('') || `<div class="p-10 text-center text-slate-500 text-sm font-medium">${_t('no_entries')}</div>`}
     </div>
@@ -1054,18 +1135,24 @@ function statCard(label, value, icon, grad, onClick) {
   </div>`;
 }
 function entryRow(e) {
-  const isGave = e.type === 'gave'; const d = new Date(e.entry_date);
+  const isGave = e.type === 'gave'; const d = parseLocalDate(e.entry_date);
   const c = window.contacts.find(x=>x.id===e.contact_id);
   return `<div class="p-4 flex items-center gap-3 hover:bg-white/40 dark:hover:bg-white/5 transition-colors cursor-pointer" onclick="window.openContact('${e.contact_id}')">
     <div class="w-10 h-10 rounded-2xl ${isGave?'bg-brass/15 text-brass':'bg-oxblood/15 text-oxblood'} flex items-center justify-center shrink-0"><i data-lucide="${isGave?'arrow-down-left':'arrow-up-right'}" class="w-4 h-4"></i></div>
     <div class="min-w-0 flex-1">
       <div class="flex items-center gap-1.5">
-        <p class="text-[13px] font-bold truncate">${c ? c.name : 'Unknown'}</p>
+        <p class="text-[13px] font-bold truncate">${escHtml(c ? c.name : 'Unknown')}</p>
         ${e.note ? `<i data-lucide="info" onclick="event.stopPropagation();window.showNoteInfo('${e.id}')" class="w-3.5 h-3.5 text-steel hover:text-brass cursor-pointer shrink-0"></i>` : ''}
       </div>
-      <p class="text-[10px] text-slate-500 font-medium mono mt-0.5">${e.reason ? e.reason : (isGave?_t('gave'):_t('took'))} &bull; ${formatDate(d)}</p>
+      <p class="text-[10px] text-slate-500 font-medium mono mt-0.5">${e.reason ? escHtml(e.reason) : (isGave?_t('gave'):_t('took'))} &bull; ${formatDate(d)}</p>
     </div>
-    <span class="font-bold mono tracking-tight text-sm ${isGave?'text-brass':'text-oxblood'}">${isGave?'+':'−'}৳ ${bnNum(e.amount)}</span>
+    <div class="text-right shrink-0 flex flex-col items-end gap-1">
+      <span class="font-bold mono tracking-tight text-sm ${isGave?'text-brass':'text-oxblood'}">${isGave?'+':'−'}৳ ${bnNum(e.amount)}</span>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="event.stopPropagation();window.openEditEntry('${e.id}')" class="text-[10px] text-steel hover:text-brass font-bold transition-colors">${_t('edit')}</button>
+        <button type="button" onclick="event.stopPropagation();window.deleteEntry('${e.id}')" class="text-[10px] text-slate-400 hover:text-oxblood font-bold transition-colors">${_t('del')}</button>
+      </div>
+    </div>
   </div>`;
 }
 window.showNoteInfo = (id) => {
@@ -1075,12 +1162,15 @@ window.showNoteInfo = (id) => {
   window.showModal(`
     <div class="relative text-left p-2">
       <button onclick="window.hideModal()" class="absolute -top-4 -right-4 p-2 text-slate-400 hover:text-rose-500 transition-colors rounded-full bg-slate-100 dark:bg-white/5"><i data-lucide="x" class="w-4 h-4"></i></button>
-      <div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${window.lang==='bn'?'সাথে':'With'}</p><p class="text-[15px] font-semibold text-slate-800 dark:text-white">${c?c.name:'Unknown'}</p></div>
-      ${e.reason ? `<div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${_t('reason_label')}</p><p class="text-[14px] font-semibold text-slate-800 dark:text-white">${e.reason}</p></div>` : ''}
+      <div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${window.lang==='bn'?'সাথে':'With'}</p><p class="text-[15px] font-semibold text-slate-800 dark:text-white">${escHtml(c?c.name:'Unknown')}</p></div>
+      ${e.reason ? `<div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${_t('reason_label')}</p><p class="text-[14px] font-semibold text-slate-800 dark:text-white">${escHtml(e.reason)}</p></div>` : ''}
       <div class="mb-4"><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${_t('note_label')}</p>
-        <div class="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl border border-slate-200 dark:border-white/10"><p class="text-[13px] text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap leading-relaxed">${e.note||'-'}</p></div>
+        <div class="bg-slate-100 dark:bg-white/5 p-3 rounded-2xl border border-slate-200 dark:border-white/10"><p class="text-[13px] text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap leading-relaxed">${escHtml(e.note||'-')}</p></div>
       </div>
-      <div><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${_t('amount_label')}</p><p class="text-xl font-semibold mono tracking-tight ${isGave ? 'text-brass' : 'text-oxblood'}">${isGave ? '+' : '−'}৳ ${bnNum(e.amount)}</p></div>
+      <div class="flex items-end justify-between gap-3">
+        <div><p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">${_t('amount_label')}</p><p class="text-xl font-semibold mono tracking-tight ${isGave ? 'text-brass' : 'text-oxblood'}">${isGave ? '+' : '−'}৳ ${bnNum(e.amount)}</p></div>
+        <button type="button" onclick="window.openEditEntry('${e.id}')" class="px-4 py-2 rounded-xl bg-steel/15 text-steel border border-steel/25 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-transform"><i data-lucide="pencil" class="w-3.5 h-3.5"></i> ${_t('edit')}</button>
+      </div>
     </div>`);
 };
 
@@ -1169,7 +1259,10 @@ window.submitEntry = async (contactId) => {
     const row = { user_id: window.session.user.id, contact_id: contactId, type: window._entryType, amount, reason: (reasonEl && reasonEl.value.trim()) || null, note: (noteEl && noteEl.value.trim()) || null, entry_date: document.getElementById('entryDate').value, ref_id: refId() };
     const { data, error } = await window.supa.from('entries').insert([row]).select();
     if (error) throw error;
-    if (data && data[0]) window.entries.unshift(data[0]);
+    if (data && data[0]) {
+      window.entries.unshift(data[0]);
+      window.entries = sortEntriesDesc(window.entries);
+    }
     const c = window.contacts.find(x=>x.id===contactId);
     window.notify('entry_add', { type: row.type, amount: row.amount, contact_name: c?.name || '', ref_id: row.ref_id });
     window.showToast(_t('save_success'));
@@ -1178,6 +1271,248 @@ window.submitEntry = async (contactId) => {
     window.renderContent();
   } catch(e) { window.showToast(translateErr(e.message), 'error'); }
   finally { const freshBtn = document.getElementById('entrySaveBtn'); if (freshBtn) { freshBtn.disabled = false; freshBtn.innerHTML = og; lucide.createIcons(); } }
+};
+
+window._editEntryType = 'gave';
+window.setEditEntryType = (type) => {
+  window._editEntryType = type;
+  const isGave = type === 'gave';
+  const gBtn = document.getElementById('editTypeGaveBtn');
+  const tBtn = document.getElementById('editTypeTookBtn');
+  const sBtn = document.getElementById('editEntrySaveBtn');
+  if (gBtn) gBtn.className = `flex-1 py-2.5 rounded-xl font-bold text-xs transition-all border ${isGave ? 'bg-brass text-[#120E29] border-brass shadow-sm' : 'glass-input text-slate-500 border-transparent'}`;
+  if (tBtn) tBtn.className = `flex-1 py-2.5 rounded-xl font-bold text-xs transition-all border ${!isGave ? 'bg-oxblood text-white border-oxblood shadow-sm' : 'glass-input text-slate-500 border-transparent'}`;
+  if (sBtn) sBtn.className = `flex-1 py-3 rounded-2xl font-bold shadow-lg active:scale-95 transition-transform ${isGave ? 'bg-brass text-[#120E29] shadow-brass/20' : 'bg-oxblood text-white shadow-oxblood/20'}`;
+};
+
+window.openEditEntry = (id) => {
+  window.closeCalc();
+  const e = window.entries.find(x => x.id === id);
+  if (!e) return;
+  window._editEntryType = e.type || 'gave';
+  const isGave = window._editEntryType === 'gave';
+  const contactOptions = window.contacts.map(c => `<option value="${c.id}" ${c.id === e.contact_id ? 'selected' : ''}>${escHtml(c.name)}${c.phone ? ' (' + escHtml(c.phone) + ')' : ''}</option>`).join('');
+  window.showModal(`
+    <div class="text-left">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="disp font-bold text-lg">${_t('edit_entry')}</h3>
+        <button type="button" onclick="window.hideModal()" class="p-1.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-400 hover:text-oxblood"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('person_label')}</label>
+      <select id="editEntryContact" class="w-full px-3.5 py-3 rounded-2xl glass-input dyn-focus text-[13px] font-semibold outline-none mb-3.5 bg-white dark:bg-[#1B1638] text-slate-800 dark:text-white">
+        ${contactOptions}
+      </select>
+
+      <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('type_label')}</label>
+      <div class="flex gap-2 mb-3.5">
+        <button type="button" id="editTypeGaveBtn" onclick="window.setEditEntryType('gave')" class="flex-1 py-2.5 rounded-xl font-bold text-xs transition-all border ${isGave ? 'bg-brass text-[#120E29] border-brass shadow-sm' : 'glass-input text-slate-500 border-transparent'}">${_t('gave')}</button>
+        <button type="button" id="editTypeTookBtn" onclick="window.setEditEntryType('took')" class="flex-1 py-2.5 rounded-xl font-bold text-xs transition-all border ${!isGave ? 'bg-oxblood text-white border-oxblood shadow-sm' : 'glass-input text-slate-500 border-transparent'}">${_t('took')}</button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2.5 mb-3.5">
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('amount_label')}</label>
+          <input id="editEntryAmount" type="text" inputmode="decimal" value="${escHtml(e.amount)}" class="w-full px-3.5 py-3 rounded-2xl glass-input dyn-focus text-sm font-bold mono outline-none">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('date_label')}</label>
+          <input id="editEntryDate" type="date" value="${escHtml(e.entry_date || getLocalDateString())}" class="w-full px-3 py-3 rounded-2xl glass-input dyn-focus text-xs font-semibold outline-none">
+        </div>
+      </div>
+
+      <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('reason_label')}</label>
+      <input id="editEntryReason" type="text" value="${escHtml(e.reason || '')}" placeholder="${window.lang==='bn'?'যেমনঃ বাজার খরচ':'e.g. Lunch money'}" class="w-full px-3.5 py-3 rounded-2xl glass-input dyn-focus text-[13px] font-medium outline-none mb-3.5">
+
+      <label class="text-[10px] font-bold uppercase text-slate-500 mb-1.5 block">${_t('note_label')}</label>
+      <textarea id="editEntryNote" placeholder="${_t('note_label')}" class="w-full px-3.5 py-3 rounded-2xl glass-input dyn-focus text-[13px] font-medium outline-none min-h-[76px] resize-none mb-4">${escHtml(e.note || '')}</textarea>
+
+      <div class="flex gap-3">
+        <button type="button" onclick="window.hideModal()" class="flex-1 py-3 bg-slate-200 dark:bg-white/10 rounded-2xl font-bold active:scale-95 transition-transform">${_t('close')}</button>
+        <button type="button" id="editEntrySaveBtn" onclick="window.saveEditedEntry('${e.id}')" class="flex-1 py-3 rounded-2xl font-bold shadow-lg active:scale-95 transition-transform ${isGave ? 'bg-brass text-[#120E29] shadow-brass/20' : 'bg-oxblood text-white shadow-oxblood/20'}">${_t('update_entry')}</button>
+      </div>
+    </div>`);
+};
+
+window.saveEditedEntry = async (id) => {
+  const btn = document.getElementById('editEntrySaveBtn');
+  const og = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mx-auto"></i>'; lucide.createIcons(); }
+  try {
+    const rawAmount = (document.getElementById('editEntryAmount')?.value || '').trim();
+    let amount = 0;
+    try {
+      const expr = rawAmount.replace(/÷/g, '/').replace(/×/g, '*').replace(/−/g, '-');
+      const res = Function('"use strict"; return (' + expr + ')')();
+      amount = Number(Number(res).toFixed(2));
+    } catch (err) { amount = 0; }
+    if (!amount || amount <= 0 || !isFinite(amount)) throw new Error(_t('req_entry_fields'));
+
+    const contact_id = document.getElementById('editEntryContact')?.value;
+    if (!contact_id) throw new Error(_t('req_fields'));
+    const type = window._editEntryType || 'gave';
+    const entry_date = document.getElementById('editEntryDate')?.value || getLocalDateString();
+    const reason = (document.getElementById('editEntryReason')?.value || '').trim() || null;
+    const note = (document.getElementById('editEntryNote')?.value || '').trim() || null;
+
+    const updates = { contact_id, type, amount, entry_date, reason, note };
+    const { data, error } = await window.supa.from('entries').update(updates).eq('id', id).select();
+    if (error) throw error;
+
+    const idx = window.entries.findIndex(x => x.id === id);
+    if (idx !== -1) {
+      window.entries[idx] = (data && data[0]) ? data[0] : { ...window.entries[idx], ...updates };
+      window.entries = sortEntriesDesc(window.entries);
+    }
+    const c = window.contacts.find(x => x.id === contact_id);
+    window.notify('entry_edit', { type, amount, contact_name: c?.name || '', ref_id: window.entries.find(x=>x.id===id)?.ref_id || '' });
+    window.hideModal();
+    window.showToast(_t('entry_updated'));
+    window.renderContent();
+  } catch (e) {
+    window.showToast(translateErr(e.message), 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = og; lucide.createIcons(); }
+  }
+};
+
+window.openStatement = (contactId) => {
+  window.closeCalc();
+  const c = window.contacts.find(x => x.id === contactId);
+  if (!c) return;
+  const { gave, took, net } = contactStats(contactId);
+  const rows = sortEntriesDesc(window.entries.filter(e => e.contact_id === contactId));
+  const now = new Date();
+  const isBn = window.lang === 'bn';
+
+  let periodText = '';
+  if (rows.length > 0) {
+    const oldest = rows[rows.length - 1];
+    const startDate = parseLocalDate(oldest.entry_date);
+    periodText = isBn
+      ? `${formatDate(startDate)} থেকে ${formatDateTime(now)} পর্যন্ত এর স্টেটমেন্ট`
+      : `Statement from ${formatDate(startDate)} to ${formatDateTime(now)}`;
+  } else {
+    periodText = isBn
+      ? `তৈরির সময়: ${formatDateTime(now)}`
+      : `Generated on ${formatDateTime(now)}`;
+  }
+
+  const netLabel = net > 0 ? _t('owes_you') : (net < 0 ? _t('you_owe') : _t('settled'));
+  const netBg = net > 0 ? 'background:#dcfce7;border-color:#22c55e;color:#14532d;' : (net < 0 ? 'background:#fee2e2;border-color:#ef4444;color:#7f1d1d;' : 'background:#f1f5f9;border-color:#cbd5e1;color:#334155;');
+
+  const renderEntryCard = (e, serialNum, isGaveCard) => {
+    const boxClass = isGaveCard ? 'stmt-box-gave' : 'stmt-box-took';
+    const badgeBg = isGaveCard ? 'background:#16a34a;color:#ffffff;' : 'background:#dc2626;color:#ffffff;';
+    const noteBg = isGaveCard ? 'background:rgba(255,255,255,0.72);border:1px solid rgba(22,163,74,0.28);' : 'background:rgba(255,255,255,0.72);border:1px solid rgba(220,38,38,0.28);';
+    const dateStr = formatDate(parseLocalDate(e.entry_date));
+    const timeStr = e.created_at ? formatTime(e.created_at) : '';
+    const wasEdited = e.updated_at && e.created_at && (new Date(e.updated_at).getTime() - new Date(e.created_at).getTime() > 5000);
+
+    return `
+      <div class="${boxClass} rounded-2xl p-4 sm:p-5 min-h-[120px] flex flex-col justify-between gap-2.5 shadow-sm">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full" style="${badgeBg}">#${bnNum(serialNum)} &bull; ${isGaveCard ? _t('gave') : _t('took')}</span>
+          ${e.ref_id ? `<span class="text-[10px] font-bold mono opacity-75">#${escHtml(e.ref_id)}</span>` : ''}
+        </div>
+        <div>
+          <p class="text-xl sm:text-2xl font-extrabold mono tracking-tight leading-none">৳ ${bnNum(e.amount)}</p>
+          ${e.reason ? `<p class="text-[13px] font-bold mt-2 leading-snug">${escHtml(e.reason)}</p>` : ''}
+        </div>
+        ${e.note ? `<div class="rounded-xl px-3 py-2 text-[12px] font-medium whitespace-pre-wrap leading-relaxed" style="${noteBg}">${escHtml(e.note)}</div>` : ''}
+        <div class="pt-2 border-t border-black/10 flex items-center justify-between gap-2 flex-wrap text-[11px] font-semibold opacity-80">
+          <span>${dateStr}${timeStr ? ' &bull; ' + timeStr : ''}</span>
+          ${wasEdited ? `<span class="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-black/10">${_t('edited')}</span>` : ''}
+        </div>
+      </div>`;
+  };
+
+  const rowsHtml = rows.length ? rows.map((e, idx) => {
+    const serialNum = rows.length - idx;
+    const emptyBox = `<div class="stmt-box-empty rounded-2xl min-h-[120px]"></div>`;
+    if (e.type === 'gave') {
+      return `<div class="stmt-row grid grid-cols-2 gap-3 sm:gap-5 mb-5">${emptyBox}${renderEntryCard(e, serialNum, true)}</div>`;
+    } else {
+      return `<div class="stmt-row grid grid-cols-2 gap-3 sm:gap-5 mb-5">${renderEntryCard(e, serialNum, false)}${emptyBox}</div>`;
+    }
+  }).join('') : `<div class="text-center py-12 text-slate-400 font-semibold text-sm">${_t('no_entries')}</div>`;
+
+  const overlay = document.getElementById('statementOverlay');
+  overlay.innerHTML = `
+    <div class="no-print sticky top-0 z-20 bg-slate-900/95 border-b border-white/10 px-4 py-3 flex items-center justify-between gap-3">
+      <button type="button" onclick="window.closeStatement()" class="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-transform">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i> ${_t('close')}
+      </button>
+      <span class="text-white font-bold text-sm disp truncate">${_t('statement_title')}</span>
+      <button type="button" onclick="window.printStatement()" class="px-4 py-2 rounded-xl bg-brass text-[#120E29] text-xs font-extrabold flex items-center gap-1.5 shadow-lg active:scale-95 transition-transform">
+        <i data-lucide="printer" class="w-4 h-4"></i> ${_t('print_pdf')}
+      </button>
+    </div>
+
+    <div class="w-full max-w-3xl mx-auto p-3 sm:p-6 pb-12">
+      <div id="statementSheet" class="bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-200 p-5 sm:p-8">
+        <div class="border-b-2 border-slate-200 pb-5 mb-5">
+          <div class="flex items-start justify-between gap-4 flex-wrap mb-3">
+            <div>
+              <p class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-600 mb-1">OweTrack Ledger &bull; ${_t('statement_title')}</p>
+              <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">${escHtml(c.name)}</h1>
+              <p class="text-sm font-semibold text-slate-600 mt-1">${isBn ? 'মোবাইল:' : 'Phone:'} ${escHtml(c.phone || _t('no_phone'))}</p>
+            </div>
+            <div class="text-left sm:text-right">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">${_t('total_entries')}</p>
+              <p class="text-lg font-extrabold mono text-slate-800">${bnNum(rows.length)}</p>
+            </div>
+          </div>
+          <div class="stmt-period-bar rounded-xl px-4 py-2.5 text-xs sm:text-[13px] font-bold text-slate-700" style="background:#f1f5f9;border:1px solid #cbd5e1;">
+            ${periodText}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2.5 sm:gap-4 mb-6">
+          <div class="stmt-summary-card rounded-2xl p-3 sm:p-4 text-center border-2" style="background:#fef2f2;border-color:#fca5a5;color:#991b1b;">
+            <p class="text-[10px] font-extrabold uppercase tracking-wider opacity-80 mb-1">${_t('total_took')}</p>
+            <p class="text-base sm:text-lg font-extrabold mono">৳ ${bnNum(took)}</p>
+          </div>
+          <div class="stmt-summary-card rounded-2xl p-3 sm:p-4 text-center border-2" style="background:#f0fdf4;border-color:#86efac;color:#166534;">
+            <p class="text-[10px] font-extrabold uppercase tracking-wider opacity-80 mb-1">${_t('total_gave')}</p>
+            <p class="text-base sm:text-lg font-extrabold mono">৳ ${bnNum(gave)}</p>
+          </div>
+          <div class="stmt-summary-card rounded-2xl p-3 sm:p-4 text-center border-2" style="${netBg}">
+            <p class="text-[10px] font-extrabold uppercase tracking-wider opacity-80 mb-1">${netLabel}</p>
+            <p class="text-base sm:text-lg font-extrabold mono">৳ ${bnNum(Math.abs(net))}</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 sm:gap-5 mb-4">
+          <div class="stmt-col-head rounded-xl py-2.5 px-3 text-center font-extrabold text-xs sm:text-sm uppercase tracking-wider border-2" style="background:#fee2e2;border-color:#ef4444;color:#991b1b;">
+            ${_t('took')} (${isBn ? 'বামে' : 'Left'})
+          </div>
+          <div class="stmt-col-head rounded-xl py-2.5 px-3 text-center font-extrabold text-xs sm:text-sm uppercase tracking-wider border-2" style="background:#dcfce7;border-color:#22c55e;color:#166534;">
+            ${_t('gave')} (${isBn ? 'ডানে' : 'Right'})
+          </div>
+        </div>
+
+        <div>${rowsHtml}</div>
+
+        <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2 text-[11px] font-semibold text-slate-400">
+          <span>OweTrack Ledger</span>
+          <span>${isBn ? 'তৈরির সময়:' : 'Generated:'} ${formatDateTime(now)}</span>
+        </div>
+      </div>
+    </div>`;
+
+  overlay.classList.remove('hidden');
+  overlay.classList.add('flex');
+  overlay.scrollTop = 0;
+  lucide.createIcons();
+};
+
+window.closeStatement = () => {
+  const overlay = document.getElementById('statementOverlay');
+  if (overlay) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); overlay.innerHTML = ''; }
+};
+
+window.printStatement = () => {
+  window.print();
 };
 
 window.deleteEntry = async (id) => {

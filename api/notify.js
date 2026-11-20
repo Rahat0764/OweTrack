@@ -23,6 +23,9 @@ module.exports = async (req, res) => {
     case 'entry_add':
       msg = `💰 <b>${details.type === 'gave' ? 'Gave (You → Them)' : 'Took (Them → You)'}</b>\n👤 ${name}\n🧑 With: ${details.contact_name}\n💵 ৳${details.amount}\n🔑 Ref #${details.ref_id}`;
       break;
+    case 'entry_edit':
+      msg = `✏️ <b>Entry Edited (${details.type === 'gave' ? 'Gave' : 'Took'})</b>\n👤 ${name}\n🧑 With: ${details.contact_name}\n💵 ৳${details.amount}\n🔑 Ref #${details.ref_id}`;
+      break;
     case 'entry_delete':
       msg = `🗑️ <b>Entry Deleted</b>\n👤 ${name}\n🔑 Ref #${details.ref_id}\n💵 ৳${details.amount}`;
       break;

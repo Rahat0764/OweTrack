@@ -34,10 +34,12 @@ create table if not exists entries (
   contact_id uuid references contacts(id) on delete cascade not null,
   type text not null check (type in ('gave','took')),
   amount numeric not null check (amount > 0),
+  reason text,
   note text,
   entry_date date not null default current_date,
   ref_id text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 create index if not exists entries_user_idx on entries(user_id);
@@ -74,23 +76,30 @@ alter table user_feedback enable row level security;
 alter table feedback enable row level security;
 
 -- profiles: user can read/update only their own row
+drop policy if exists "profiles_select_own" on profiles;
 create policy "profiles_select_own" on profiles for select using (auth.uid() = id);
+drop policy if exists "profiles_update_own" on profiles;
 create policy "profiles_update_own" on profiles for update using (auth.uid() = id);
+drop policy if exists "profiles_insert_own" on profiles;
 create policy "profiles_insert_own" on profiles for insert with check (auth.uid() = id);
 
 -- contacts: full CRUD on own rows
+drop policy if exists "contacts_all_own" on contacts;
 create policy "contacts_all_own" on contacts for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- entries: full CRUD on own rows
+drop policy if exists "entries_all_own" on entries;
 create policy "entries_all_own" on entries for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- user_feedback: a user can insert/read their own feedback (admin routes use the service role key and bypass RLS)
+drop policy if exists "user_feedback_own" on user_feedback;
 create policy "user_feedback_own" on user_feedback for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- feedback: a user can read messages addressed to them (only admin routes insert, via service role)
+drop policy if exists "feedback_select_own" on feedback;
 create policy "feedback_select_own" on feedback for select using (auth.uid() = user_id);
 
 -- ---------- Storage bucket for avatars ----------
