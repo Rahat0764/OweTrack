@@ -42,6 +42,25 @@ create table if not exists entries (
   updated_at timestamptz default now()
 );
 
+alter table entries add column if not exists reason text;
+alter table entries add column if not exists updated_at timestamptz default now();
+
+create or replace function public.set_entries_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_entries_updated_at on public.entries;
+create trigger trg_entries_updated_at
+  before update on public.entries
+  for each row
+  execute function public.set_entries_updated_at();
+
 create index if not exists entries_user_idx on entries(user_id);
 create index if not exists entries_contact_idx on entries(contact_id);
 create index if not exists contacts_user_idx on contacts(user_id);
